@@ -1,0 +1,10 @@
+language Essence 1.3
+
+find Eqn_0 : int(1..1000000)
+find Eqn_1 : int(1..1000000)
+find Eqn_2 : int(1..1000000)
+find tag : int(1..1)
+
+such that
+
+((Eqn_0 + Eqn_1) = Eqn_2) /\ tag = 1

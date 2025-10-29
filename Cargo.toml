@@ -1,0 +1,12 @@
+[package]
+name = "haskell_parser"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+tree-sitter = "0.25.9"
+tree-sitter-haskell = "0.23.1"
+conjure-cp-core = { path = "../conjure-oxide/crates/conjure-cp-core" }
+tree-sitter-idris = { path = "../tree-sitter-idris" }
+ustr = "1.1.0"
+tree-sitter-rust = "0.24.0"

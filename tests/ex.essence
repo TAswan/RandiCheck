@@ -1,0 +1,9 @@
+language Essence 1.3
+
+find Range_0 : int(1..100)
+find Range_1 : int(1..2)
+find tag : int(1..1)
+
+such that
+
+(Range_0 <= Range_1) /\ tag = 1
