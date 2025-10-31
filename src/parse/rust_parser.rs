@@ -1,36 +1,18 @@
 use tree_sitter::Tree;
 
-use crate::adt::{self, Adt, Cons, Func, FuncInput, Operand, Operation, Type};
-use crate::parser_utils::{
-    print_node, print_nodes, traverse_and_capture, traverse_and_capture_from_node,
-};
-
-
-
-// parses the given rust source file and returns the syntax tree
-pub fn parse_rust(file_name: String) -> Tree {
-    let source_code = std::fs::read_to_string(file_name).expect("Could not read file");
-    let mut parser = tree_sitter::Parser::new();
-    let language = tree_sitter_rust::LANGUAGE;
-    parser
-        .set_language(&language.into())
-        .expect("Error loading rust parser");
-
-    parser
-        .parse(&source_code, None)
-        .expect("Error parsing source code")
-
-    
-}
-
+use crate::adt::{Adt, Cons, Func, FuncInput, Operand, Operation, Type};
+use crate::parse::parser_utils::{print_nodes, traverse_and_capture_from_node};
 
 pub fn collect_rust_adts(tree: &Tree, source_code: &str, verbose: bool) -> Adt {
     let root = tree.root_node();
 
     let adt_nodes = traverse_and_capture_from_node(root, "enum_item");
-   // let mut adts = Vec::new();
+    // let mut adts = Vec::new();
     if adt_nodes.len() != 1 {
-        panic!("Expected exactly one ADT in the source file, found {}", adt_nodes.len());
+        panic!(
+            "Expected exactly one ADT in the source file, found {}",
+            adt_nodes.len()
+        );
     }
 
     let adt_node = &adt_nodes[0];
@@ -39,11 +21,9 @@ pub fn collect_rust_adts(tree: &Tree, source_code: &str, verbose: bool) -> Adt {
         print_nodes(adt_node, 0, source_code, false);
     }
 
-   let binding = traverse_and_capture_from_node(*adt_node, "type_identifier");
-   let adt_name_node = binding
-        .get(0)
-        .expect("Could not find ADT name node");
-    
+    let binding = traverse_and_capture_from_node(*adt_node, "type_identifier");
+    let adt_name_node = binding.first().expect("Could not find ADT name node");
+
     let adt_name = source_code[adt_name_node.start_byte()..adt_name_node.end_byte()].to_string();
     if verbose {
         println!("ADT Name: {}", adt_name);
@@ -56,10 +36,12 @@ pub fn collect_rust_adts(tree: &Tree, source_code: &str, verbose: bool) -> Adt {
     for constructor_node in constructor_nodes {
         let binding = traverse_and_capture_from_node(constructor_node, "identifier");
         let constructor_name_node = binding
-            .get(0)
+            .first()
             .expect("Could not find constructor name node");
 
-        let constructor_name = source_code[constructor_name_node.start_byte()..constructor_name_node.end_byte()].to_string();
+        let constructor_name = source_code
+            [constructor_name_node.start_byte()..constructor_name_node.end_byte()]
+            .to_string();
 
         if verbose {
             println!("Constructor Name: {}", constructor_name);
@@ -85,32 +67,28 @@ pub fn collect_rust_adts(tree: &Tree, source_code: &str, verbose: bool) -> Adt {
             types,
         };
         constructors.push(constructor);
-
-
-
     }
-    if verbose{
-        
+    if verbose {
         println!("Constructors: {:?}", constructors);
-
     }
     Adt {
         name: adt_name,
         constructors,
     }
-
 }
 
 pub fn collect_rust_functions(
     tree: &Tree,
     source_code: &str,
-    adt_name: &str,
+    _adt_name: &str,
     verbose: bool,
 ) -> Vec<Func> {
-    
     let functions = traverse_and_capture_from_node(tree.root_node(), "function_item");
     if functions.len() != 1 {
-        panic!("Expected exactly one function in the source file, found {}", functions.len());
+        panic!(
+            "Expected exactly one function in the source file, found {}",
+            functions.len()
+        );
     }
 
     let function_node = &functions[0];
@@ -137,7 +115,9 @@ pub fn collect_rust_functions(
             .pop()
             .expect("Could not find function constructor name node");
 
-        let constructor_name = source_code[constructor_name_node.start_byte()..constructor_name_node.end_byte()].to_string();
+        let constructor_name = source_code
+            [constructor_name_node.start_byte()..constructor_name_node.end_byte()]
+            .to_string();
         if verbose {
             println!("Function Constructor: {}", constructor_name);
         }
@@ -145,7 +125,8 @@ pub fn collect_rust_functions(
         let mut inputs = Vec::new();
 
         while let Some(input_node) = identifiers.pop() {
-            let input_name = source_code[input_node.start_byte()..input_node.end_byte()].to_string();
+            let input_name =
+                source_code[input_node.start_byte()..input_node.end_byte()].to_string();
             inputs.push(input_name);
         }
         inputs.reverse();
@@ -155,7 +136,7 @@ pub fn collect_rust_functions(
 
         let func_input = FuncInput {
             prefix: constructor_name,
-            input: inputs
+            input: inputs,
         };
 
         let mut cursor = func_node.walk();
@@ -170,7 +151,6 @@ pub fn collect_rust_functions(
             }
         }
 
-    
         let expr_node = cursor.node();
         let expr_text = source_code[expr_node.start_byte()..expr_node.end_byte()].to_string();
         if verbose {
@@ -198,14 +178,20 @@ pub fn collect_rust_functions(
                 let operator_node = bin_cursor.node();
                 bin_cursor.goto_next_sibling();
                 let right_node = bin_cursor.node();
-                let left_value = source_code[left_node.start_byte()..left_node.end_byte()].to_string();
-                let right_value = source_code[right_node.start_byte()..right_node.end_byte()].to_string();
-                let operator_value = source_code[operator_node.start_byte()..operator_node.end_byte()].to_string();
+                let left_value =
+                    source_code[left_node.start_byte()..left_node.end_byte()].to_string();
+                let right_value =
+                    source_code[right_node.start_byte()..right_node.end_byte()].to_string();
+                let operator_value =
+                    source_code[operator_node.start_byte()..operator_node.end_byte()].to_string();
                 if verbose {
-                    println!("Left: {}, Operator: {}, Right: {}", left_value, operator_value, right_value);
+                    println!(
+                        "Left: {}, Operator: {}, Right: {}",
+                        left_value, operator_value, right_value
+                    );
                 }
                 let left_operand = Operand::Var(left_value);
-                
+
                 let right_operand = if let Ok(n) = right_value.parse::<i32>() {
                     Operand::Lit(n)
                 } else {
@@ -228,14 +214,11 @@ pub fn collect_rust_functions(
                     opp: operation,
                 };
                 funcs.push(func);
-        },
+            }
             _ => {
                 panic!("Unsupported function expression kind: {}", expr_node.kind());
             }
-
-    }
-
-
+        }
     }
 
     funcs

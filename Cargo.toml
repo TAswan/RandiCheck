@@ -1,5 +1,5 @@
 [package]
-name = "haskell_parser"
+name = "randi_check"
 version = "0.1.0"
 edition = "2024"
 
@@ -10,3 +10,4 @@ conjure-cp-core = { path = "../conjure-oxide/crates/conjure-cp-core" }
 tree-sitter-idris = { path = "../tree-sitter-idris" }
 ustr = "1.1.0"
 tree-sitter-rust = "0.24.0"
+clap = "4.5.51"

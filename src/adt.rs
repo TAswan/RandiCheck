@@ -1,4 +1,7 @@
+#![allow(dead_code)]
+
 use std::fmt;
+
 #[derive(Debug, Clone)]
 pub struct Adt {
     pub name: String,

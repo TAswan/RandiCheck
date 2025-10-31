@@ -1,19 +1,5 @@
 use tree_sitter::Tree;
 
-// parses the given Haskell source file and returns the syntax tree
-pub fn parse_haskell(file_name: String) -> Tree {
-    let source_code = std::fs::read_to_string(file_name).expect("Could not read file");
-    let mut parser = tree_sitter::Parser::new();
-    let language = tree_sitter_haskell::LANGUAGE;
-    parser
-        .set_language(&language.into())
-        .expect("Error loading Haskell parser");
-
-    parser
-        .parse(&source_code, None)
-        .expect("Error parsing source code")
-}
-
 // traverses the given tree and captures all nodes of the specified kind
 pub fn traverse_and_capture<'a>(tree: &'a Tree, kind: &'a str) -> Vec<tree_sitter::Node<'a>> {
     let root = tree.root_node();
@@ -68,20 +54,20 @@ pub fn print_nodes(node: &tree_sitter::Node, depth: usize, text: &str, verbose: 
             node.start_byte(),
             node.end_byte()
         )
+    } else {
+        println!(
+            "{}Node: {} [{}-{}] \n text: '{}' \n\n",
+            "  ".repeat(depth),
+            node.kind(),
+            node.start_byte(),
+            node.end_byte(),
+            &text[node.start_byte()..node.end_byte()]
+        );
     }
-    else {
-    println!(
-        "{}Node: {} [{}-{}] \n text: '{}' \n\n",
-        "  ".repeat(depth),
-        node.kind(),
-        node.start_byte(),
-        node.end_byte(),
-        &text[node.start_byte()..node.end_byte()]
-    );}
     let mut child_cursor = node.walk();
     if child_cursor.goto_first_child() {
         loop {
-            print_nodes(&child_cursor.node(), depth + 1, text,verbose);
+            print_nodes(&child_cursor.node(), depth + 1, text, verbose);
             if !child_cursor.goto_next_sibling() {
                 break;
             }

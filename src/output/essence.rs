@@ -1,9 +1,10 @@
 use core::panic;
+use std::fs::File;
 
 // This module takes in the parsed haskell AST and outputs an Essence specification as raw text.
 use crate::adt::{Adt, Func, Operand, Operation, Type};
 
-pub fn essence(adt: Adt, funs: Vec<Func>, verbose: bool) -> String {
+pub fn generate_essence_output(adt: Adt, funs: Vec<Func>, verbose: bool) -> File {
     let mut essence_spec = String::new();
 
     essence_spec.push_str("language Essence 1.3\n\n");
@@ -15,7 +16,18 @@ pub fn essence(adt: Adt, funs: Vec<Func>, verbose: bool) -> String {
 
     essence_spec.push_str(&funtext(adt.clone(), funs, verbose));
 
-    essence_spec
+    if verbose {
+        println!("--- Generated Essence Specification ---");
+        println!("{}", essence_spec);
+    }
+
+    // Write to file
+    let mut file = std::fs::File::create("output.essence").expect("Could not create output file");
+    use std::io::Write;
+    file.write_all(essence_spec.as_bytes())
+        .expect("Could not write to output file");
+
+    file
 }
 
 fn adtext(adt: Adt) -> String {
@@ -120,15 +132,6 @@ fn funtext(adt: Adt, funs: Vec<Func>, verbose: bool) -> String {
         str.push_str(&operand_str(r.clone(), f));
         str.push(')');
 
-        // get the index of the function input that matches the left string
-        // get the index of the function input that matches the right string
-        //let right_index = f.con.input.iter().position(|t| t == r).unwrap();
-        // println!("Left index: {}, Right index: {}", left_index, right_index);
-        //  str.push_str(&format!(
-        //     "({}_{} <= {}_{})",
-        //   func_con.prefix, left_index, func_con.prefix, right_index
-        //));
-
         str.push_str(&format!(
             " /\\ tag = {}",
             prefixes.iter().position(|p| p == &f.con.prefix).unwrap() + 1
@@ -157,15 +160,43 @@ fn funtext(adt: Adt, funs: Vec<Func>, verbose: bool) -> String {
     str
 }
 
-fn infix_str(infix : Box<Operation>, func_input: &Func) -> String {
+fn infix_str(infix: Box<Operation>, func_input: &Func) -> String {
     match *infix {
-        Operation::Gt(l, r) => format!("({} > {})", operand_str(l, func_input), operand_str(r, func_input)),
-        Operation::Lt(l, r) => format!("({} < {})", operand_str(l, func_input), operand_str(r, func_input)),
-        Operation::Eq(l, r) => format!("({} = {})", operand_str(l, func_input), operand_str(r, func_input)),
-        Operation::Neq(l, r) => format!("({} != {})", operand_str(l, func_input), operand_str(r, func_input)),
-        Operation::Leq(l, r) => format!("({} <= {})", operand_str(l, func_input), operand_str(r, func_input)),
-        Operation::Geq(l, r) => format!("({} >= {})", operand_str(l, func_input), operand_str(r, func_input)),
-        Operation::Add(l, r) => format!("({} + {})", operand_str(l, func_input), operand_str(r, func_input)),
+        Operation::Gt(l, r) => format!(
+            "({} > {})",
+            operand_str(l, func_input),
+            operand_str(r, func_input)
+        ),
+        Operation::Lt(l, r) => format!(
+            "({} < {})",
+            operand_str(l, func_input),
+            operand_str(r, func_input)
+        ),
+        Operation::Eq(l, r) => format!(
+            "({} = {})",
+            operand_str(l, func_input),
+            operand_str(r, func_input)
+        ),
+        Operation::Neq(l, r) => format!(
+            "({} != {})",
+            operand_str(l, func_input),
+            operand_str(r, func_input)
+        ),
+        Operation::Leq(l, r) => format!(
+            "({} <= {})",
+            operand_str(l, func_input),
+            operand_str(r, func_input)
+        ),
+        Operation::Geq(l, r) => format!(
+            "({} >= {})",
+            operand_str(l, func_input),
+            operand_str(r, func_input)
+        ),
+        Operation::Add(l, r) => format!(
+            "({} + {})",
+            operand_str(l, func_input),
+            operand_str(r, func_input)
+        ),
         _ => panic!("Unsupported infix operation {:?}", infix),
     }
 }

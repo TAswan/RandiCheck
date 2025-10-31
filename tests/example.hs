@@ -1,8 +1,7 @@
 
 
-data Test =  IntC Int | BoolC Bool | BoolD Bool Boo
+data Test =  IntC Int | BoolC Bool | BoolD Bool Bool
 
-data Boo = Bo Bool
 
 foo :: Test -> Bool
 foo (BoolC b) = b
