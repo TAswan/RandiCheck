@@ -1,6 +1,7 @@
 use clap::Parser;
-use randi_check::output::generate;
+use randi_check::generate::generate;
 use randi_check::parse::parser;
+use randi_check::solve::solve_conjure::solve_conjure;
 
 mod adt;
 
@@ -33,5 +34,7 @@ fn main() {
 
     let (adt, funcs) = parser::parse(&source_code, filetype, verbose);
 
-    let _spec = generate::output(adt, funcs, oxide_out, verbose);
+    let spec = generate::output(adt, funcs, oxide_out, verbose);
+
+    solve_conjure(spec, verbose);
 }

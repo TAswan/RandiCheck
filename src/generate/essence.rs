@@ -1,10 +1,10 @@
 use core::panic;
-use std::fs::File;
+use std::io::Write;
 
 // This module takes in the parsed haskell AST and outputs an Essence specification as raw text.
 use crate::adt::{Adt, Func, Operand, Operation, Type};
 
-pub fn generate_essence_output(adt: Adt, funs: Vec<Func>, verbose: bool) -> File {
+pub fn generate_essence_output(adt: Adt, funs: Vec<Func>, verbose: bool) -> String {
     let mut essence_spec = String::new();
 
     essence_spec.push_str("language Essence 1.3\n\n");
@@ -22,12 +22,13 @@ pub fn generate_essence_output(adt: Adt, funs: Vec<Func>, verbose: bool) -> File
     }
 
     // Write to file
-    let mut file = std::fs::File::create("output.essence").expect("Could not create output file");
-    use std::io::Write;
+    let path = "output.essence";
+    let mut file = std::fs::File::create(path).expect("Could not create output file");
     file.write_all(essence_spec.as_bytes())
         .expect("Could not write to output file");
 
-    file
+    path.to_string()
+
 }
 
 fn adtext(adt: Adt) -> String {
@@ -55,6 +56,7 @@ fn adtext(adt: Adt) -> String {
 }
 fn funtext(adt: Adt, funs: Vec<Func>, verbose: bool) -> String {
     let mut str = String::new();
+    
 
     let prefixes = adt
         .constructors
@@ -148,7 +150,6 @@ fn funtext(adt: Adt, funs: Vec<Func>, verbose: bool) -> String {
                     }
                 }
             }
-            str.push(')');
         }
 
         // if not the last function, add a newline

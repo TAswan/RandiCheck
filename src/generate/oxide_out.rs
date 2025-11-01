@@ -21,7 +21,7 @@ use conjure_cp_core::{
 };
 use ustr::Ustr;
 
-pub fn generate_oxide_output(adt: Adt, funcs: Vec<Func>, verbose: bool) -> std::fs::File {
+pub fn generate_oxide_output(adt: Adt, funcs: Vec<Func>, verbose: bool) -> String {
     if verbose {
         println!("--- Generating Oxide Output ---");
         println!("--- ADT ---");
@@ -98,7 +98,7 @@ pub fn generate_oxide_output(adt: Adt, funcs: Vec<Func>, verbose: bool) -> std::
     file.write_all(format!("{model}").as_bytes())
         .expect("Could not write to output file");
 
-    file
+    "output.oxide".to_string()
 }
 
 fn create_model(

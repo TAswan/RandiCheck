@@ -1,3 +1,4 @@
 pub mod adt;
-pub mod output;
+pub mod generate;
 pub mod parse;
+pub mod solve;
