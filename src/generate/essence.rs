@@ -1,24 +1,25 @@
 use core::panic;
+use std::fmt::Write as _;
 use std::io::Write;
 
 // This module takes in the parsed haskell AST and outputs an Essence specification as raw text.
 use crate::adt::{Adt, Func, Operand, Operation, Type};
 
-pub fn generate_essence_output(adt: Adt, funs: Vec<Func>, verbose: bool) -> String {
+pub fn generate_essence_output(adt: &Adt, funs: &[Func], verbose: bool) -> String {
     let mut essence_spec = String::new();
 
     essence_spec.push_str("language Essence 1.3\n\n");
 
-    essence_spec.push_str(&adtext(adt.clone()));
+    essence_spec.push_str(&adtext(adt));
 
     essence_spec.push_str("\n\n");
     essence_spec.push_str("such that\n\n");
 
-    essence_spec.push_str(&funtext(adt.clone(), funs, verbose));
+    essence_spec.push_str(&funtext(adt, funs, verbose));
 
     if verbose {
         println!("--- Generated Essence Specification ---");
-        println!("{}", essence_spec);
+        println!("{essence_spec}");
     }
 
     // Write to file
@@ -28,16 +29,16 @@ pub fn generate_essence_output(adt: Adt, funs: Vec<Func>, verbose: bool) -> Stri
         .expect("Could not write to output file");
 
     path.to_string()
-
 }
 
-fn adtext(adt: Adt) -> String {
+fn adtext(adt: &Adt) -> String {
     let mut str = String::new();
     let len = adt.constructors.len();
 
     for con in &adt.constructors {
         for (i, t) in con.types.iter().enumerate() {
-            str.push_str(&format!("find {}_{} : ", con.prefix, i));
+            let _ = write!(str, "find {}_{} : ", con.prefix, i);
+
             match t {
                 Type::Int => {
                     // For simplicity, we assume all integers are in the range 1 to 5
@@ -50,27 +51,26 @@ fn adtext(adt: Adt) -> String {
         }
     }
 
-    str.push_str(&format!("find tag : int(1..{})", len));
+    let _ = write!(str, "find tag : int(1..{len})");
 
     str
 }
-fn funtext(adt: Adt, funs: Vec<Func>, verbose: bool) -> String {
+fn funtext(adt: &Adt, funs: &[Func], verbose: bool) -> String {
     let mut str = String::new();
-    
 
     let prefixes = adt
         .constructors
         .iter()
         .map(|c| c.prefix.clone())
         .collect::<Vec<String>>();
-    for f in &funs {
+    for f in funs {
         // check the function's input constructor is in the Adt constructors
-        if !prefixes.contains(&f.con.prefix) {
-            panic!(
-                "Function input constructor {} not in Adt constructors {:?}",
-                f.con.prefix, prefixes
-            );
-        }
+        assert!(
+            prefixes.contains(&f.con.prefix),
+            "Function input constructor {} not in Adt constructors {:?}",
+            f.con.prefix,
+            prefixes
+        );
         // get the list of constructors that are not the function's input constructor
         let not_prefixes = prefixes
             .iter()
@@ -84,39 +84,40 @@ fn funtext(adt: Adt, funs: Vec<Func>, verbose: bool) -> String {
             .find(|c| c.prefix == f.con.prefix)
             .unwrap();
         let str_op = match &f.opp {
-            Operation::ConstSelf => "=",
+            Operation::ConstSelf | Operation::Eq(_, _) => "=",
             Operation::Gt(_, _) => ">",
             Operation::Lt(_, _) => "<",
-            Operation::Eq(_, _) => "=",
             Operation::Neq(_, _) => "!=",
             Operation::Leq(_, _) => "<=",
             Operation::Geq(_, _) => ">=",
             Operation::Add(_, _) => "+",
         };
         let (l, r) = match &f.opp {
-            Operation::Gt(l, r) => (l, r),
-            Operation::Lt(l, r) => (l, r),
-            Operation::Eq(l, r) => (l, r),
-            Operation::Neq(l, r) => (l, r),
-            Operation::Leq(l, r) => (l, r),
-            Operation::Geq(l, r) => (l, r),
-            Operation::Add(l, r) => (l, r),
+            Operation::Gt(l, r)
+            | Operation::Lt(l, r)
+            | Operation::Eq(l, r)
+            | Operation::Neq(l, r)
+            | Operation::Leq(l, r)
+            | Operation::Geq(l, r)
+            | Operation::Add(l, r) => (l, r),
             //dummy values
             Operation::ConstSelf => (&Operand::Lit(0), &Operand::Lit(0)),
         };
         if verbose {
-            println!("{:?}", func_con);
-            println!("{:?}", f);
+            println!("{func_con:?}");
+            println!("{f:?}");
         }
         // if the operation is ConstSelf then we only have to set the variable = to true
         if let Operation::ConstSelf = &f.opp {
-            str.push_str(&format!(
+            let _ = write!(
+                str,
                 "({}_{} = true /\\ tag = {})",
                 f.con.prefix,
                 // very bad, fix later
                 0,
                 prefixes.iter().position(|p| p == &f.con.prefix).unwrap() + 1
-            ));
+            );
+
             // if not the last function, add a newline
             if f != funs.last().unwrap() {
                 str.push_str("\n \\/");
@@ -129,24 +130,26 @@ fn funtext(adt: Adt, funs: Vec<Func>, verbose: bool) -> String {
         str.push_str(&operand_str(l.clone(), f));
 
         // add the operator
-        str.push_str(&format!(" {} ", str_op));
+        let _ = write!(str, " {str_op} ");
         // handle right operand
         str.push_str(&operand_str(r.clone(), f));
         str.push(')');
 
-        str.push_str(&format!(
+        let _ = write!(
+            str,
             " /\\ tag = {}",
             prefixes.iter().position(|p| p == &f.con.prefix).unwrap() + 1
-        ));
+        );
+
         for np in &not_prefixes {
             let con = adt.constructors.iter().find(|c| &c.prefix == *np).unwrap();
             for (j, t) in con.types.iter().enumerate() {
                 match t {
                     Type::Int => {
-                        str.push_str(&format!(" /\\ {}_{} = 1", con.prefix, j));
+                        let _ = write!(str, " /\\ {}_{} = 1", con.prefix, j);
                     }
                     Type::Bool => {
-                        str.push_str(&format!(" /\\ {}_{} = false", con.prefix, j));
+                        let _ = write!(str, " /\\ {}_{} = false", con.prefix, j);
                     }
                 }
             }
@@ -204,7 +207,7 @@ fn infix_str(infix: Box<Operation>, func_input: &Func) -> String {
 
 fn operand_str(op: Operand, func_input: &Func) -> String {
     match op {
-        Operand::Lit(i) => format!("{}", i),
+        Operand::Lit(i) => format!("{i}"),
         Operand::Var(s) => {
             // get the index of the function input that matches the string
             let index = func_input.con.input.iter().position(|t| t == &s).unwrap();

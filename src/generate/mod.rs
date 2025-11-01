@@ -1,3 +1,3 @@
 mod essence;
-pub mod generate;
+pub mod codegen;
 mod oxide_out;

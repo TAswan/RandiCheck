@@ -3,6 +3,9 @@ use crate::parse::haskell_parser;
 use crate::parse::idris_parser;
 use crate::parse::rust_parser;
 
+#[must_use]
+/// # Panics
+/// Panics if the file type is not supported, ie not a haskell, rust or idris file.
 pub fn parse(
     source_code: &str,
     file_type: &str,
@@ -14,7 +17,7 @@ pub fn parse(
         "hs" => tree_sitter_haskell::LANGUAGE,
         "rs" => tree_sitter_rust::LANGUAGE,
         "idr" => tree_sitter_idris::LANGUAGE,
-        _ => panic!("Unsupported file type: {}", file_type),
+        _ => panic!("Unsupported file type: {file_type}"),
     };
 
     parser
@@ -35,14 +38,14 @@ pub fn parse(
         "hs" => haskell_parser::collect_haskell_adts(&tree, source_code, verbose),
         "rs" => rust_parser::collect_rust_adts(&tree, source_code, verbose),
         "idr" => idris_parser::collect_idris_adts(&tree, source_code, verbose),
-        _ => panic!("Unsupported file type: {}", file_type),
+        _ => panic!("Unsupported file type: {file_type}"),
     };
 
     let funcs = match file_type {
         "hs" => haskell_parser::collect_haskell_functions(&tree, source_code, &adt.name, verbose),
         "rs" => rust_parser::collect_rust_functions(&tree, source_code, &adt.name, verbose),
         "idr" => idris_parser::collect_idris_functions(&tree, source_code, &adt.name, verbose),
-        _ => panic!("Unsupported file type: {}", file_type),
+        _ => panic!("Unsupported file type: {file_type}"),
     };
 
     (adt, funcs)

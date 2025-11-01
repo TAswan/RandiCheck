@@ -8,15 +8,16 @@ use crate::parse::parser_utils::{
 pub fn collect_haskell_adts(tree: &Tree, source_code: &str, verbose: bool) -> Adt {
     let adt_nodes = traverse_and_capture(tree, "data_type");
 
-    if adt_nodes.len() != 1 {
-        panic!("Expected exactly one Adt in the example file");
-    }
+    assert!(
+        (adt_nodes.len() == 1),
+        "Expected exactly one Adt in the example file"
+    );
 
     let node = &adt_nodes[0];
     if verbose {
         print!("Adt: ");
         let adt_str = &source_code[node.start_byte()..node.end_byte()];
-        println!("{}\n", adt_str);
+        println!("{adt_str}\n");
         println!("{}\n", node.to_sexp());
     }
 
@@ -42,9 +43,10 @@ pub fn collect_haskell_adts(tree: &Tree, source_code: &str, verbose: bool) -> Ad
 
     for constructor in constructors {
         let prefix_node = traverse_and_capture_from_node(constructor, "constructor");
-        if prefix_node.len() != 1 {
-            panic!("Expected exactly one prefix in the constructor");
-        }
+        assert!(
+            (prefix_node.len() == 1),
+            "Expected exactly one prefix in the constructor"
+        );
         let prefix_str =
             &source_code[prefix_node[0].start_byte()..prefix_node[0].end_byte()].to_string();
 
@@ -55,7 +57,7 @@ pub fn collect_haskell_adts(tree: &Tree, source_code: &str, verbose: bool) -> Ad
             let ty = match type_str {
                 "Bool" => Type::Bool,
                 "Int" => Type::Int,
-                _ => panic!("Unknown type: {}", type_str),
+                _ => panic!("Unknown type: {type_str}"),
             };
             type_vec.push(ty);
         }
@@ -73,7 +75,7 @@ pub fn collect_haskell_adts(tree: &Tree, source_code: &str, verbose: bool) -> Ad
         constructors: cons_vec,
     };
     if verbose {
-        println!("Adt: {:?}", adt);
+        println!("Adt: {adt:?}");
     }
     adt
 }
@@ -96,17 +98,14 @@ pub fn collect_haskell_functions(
         // check if the type in the signature matches the name
 
         let names = traverse_and_capture_from_node(sig, "name");
-        if names.len() != 2 {
-            panic!("Expected exactly two names in the signature");
-        }
+        assert!(
+            (names.len() == 2),
+            "Expected exactly two names in the signature"
+        );
         let output_type = &source_code[names[0].start_byte()..names[0].end_byte()];
         let input_name = &source_code[names[1].start_byte()..names[1].end_byte()];
-        if input_name != name {
-            panic!("input doesn't match Adt name");
-        }
-        if output_type != "Bool" {
-            panic!("Expected output type to be Bool");
-        }
+        assert!((input_name == name), "input doesn't match Adt name");
+        assert!((output_type == "Bool"), "Expected output type to be Bool");
 
         // get the sibling nodes that are of kind function
         if verbose {
@@ -138,9 +137,7 @@ pub fn collect_haskell_functions(
         let mut input_cons: Vec<FuncInput> = Vec::new();
         for function in functions {
             let constructors = traverse_and_capture_from_node(function, "constructor");
-            if constructors.len() != 1 {
-                panic!("expected only one constructor")
-            }
+            assert!((constructors.len() == 1), "expected only one constructor");
             let constr_prefix =
                 &source_code[constructors[0].start_byte()..constructors[0].end_byte()];
 
@@ -164,17 +161,18 @@ pub fn collect_haskell_functions(
             }
             let con = FuncInput {
                 prefix: constr_prefix.to_string(),
-                input: input_strs.iter().map(|s| s.to_string()).collect(),
+                input: input_strs.iter().map(|s| (*s).to_string()).collect(),
             };
             input_cons.push(con.clone());
             let operations = traverse_and_capture_from_node(function, "match");
-            if operations.len() != 1 {
-                panic!("Expected exactly one match in the function");
-            }
+            assert!(
+                (operations.len() == 1),
+                "Expected exactly one match in the function"
+            );
 
             if verbose {
                 println!("Operations nodes: {}", operations.len());
-                println!("Operations: {:?}", operations);
+                println!("Operations: {operations:?}");
                 println!(
                     "Operations source: {}",
                     &source_code[operations[0].start_byte()..operations[0].end_byte()]
@@ -194,7 +192,7 @@ pub fn collect_haskell_functions(
         }
     }
     if verbose {
-        println!("All functions: {:?}", funcs);
+        println!("All functions: {funcs:?}");
     }
     funcs
 }
@@ -211,7 +209,7 @@ fn parse_operation(node: tree_sitter::Node, source_code: &str, verbose: bool) ->
     if child.kind() == "infix" {
         let infix = parse_infix(child, source_code);
         if verbose {
-            println!("Parsed infix operation: {:?}", infix);
+            println!("Parsed infix operation: {infix:?}");
         }
 
         let mut is_infix = false;
@@ -219,14 +217,14 @@ fn parse_operation(node: tree_sitter::Node, source_code: &str, verbose: bool) ->
         if let (Some(left), Some(right)) = (infix.left(), infix.right()) {
             if let Operand::Infix(left_infix) = left {
                 if verbose {
-                    println!("Left operand is an infix: {:?}", left_infix);
+                    println!("Left operand is an infix: {left_infix:?}");
                 }
                 is_infix = true;
                 // Here you would implement precedence handling if needed
             }
             if let Operand::Infix(right_infix) = right {
                 if verbose {
-                    println!("Right operand is an infix: {:?}", right_infix);
+                    println!("Right operand is an infix: {right_infix:?}");
                 }
                 is_infix = true;
                 // Here you would implement precedence handling if needed
@@ -306,7 +304,7 @@ fn parse_infix(node: tree_sitter::Node, source_code: &str) -> Operation {
             "<=" => Operation::Leq(left_op, right_op),
             ">=" => Operation::Geq(left_op, right_op),
             "+" => Operation::Add(left_op, right_op),
-            _ => panic!("Unknown operator: {}", operator),
+            _ => panic!("Unknown operator: {operator}"),
         }
     } else {
         panic!("Incomplete infix operation");
@@ -334,8 +332,8 @@ fn precedence_swap(infix: Operation) -> Operation {
         _ => return infix,
     };
     if let Operand::Infix(boxed_right_infix) = right_op {
-        let right_precedence = precedence((*boxed_right_infix).clone());
-        let current_precedence = precedence(infix.clone());
+        let right_precedence = precedence(&(*boxed_right_infix).clone());
+        let current_precedence = precedence(&infix.clone());
         if right_precedence > current_precedence {
             // we need to swap
             // extract the left and right operands of the right infix
@@ -393,7 +391,7 @@ fn precedence_swap(infix: Operation) -> Operation {
     infix
 }
 
-fn precedence(op: Operation) -> u8 {
+fn precedence(op: &Operation) -> u8 {
     match op {
         Operation::Add(_, _) => 1,
         Operation::Gt(_, _)

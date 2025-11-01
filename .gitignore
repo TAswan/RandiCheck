@@ -4,3 +4,4 @@
 dist-newstyle
 notes.md
 .z3-trace
+/conjure-output

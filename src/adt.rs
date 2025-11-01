@@ -8,7 +8,7 @@ pub struct Adt {
     pub constructors: Vec<Cons>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Cons {
     pub prefix: String,
     pub types: Vec<Type>,
@@ -36,39 +36,41 @@ impl fmt::Display for Operation {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Operation::ConstSelf => write!(f, "self"),
-            Operation::Gt(l, r) => write!(f, "{} > {}", l, r),
-            Operation::Lt(l, r) => write!(f, "{} < {}", l, r),
-            Operation::Eq(l, r) => write!(f, "{} == {}", l, r),
-            Operation::Neq(l, r) => write!(f, "{} != {}", l, r),
-            Operation::Leq(l, r) => write!(f, "{} <= {}", l, r),
-            Operation::Geq(l, r) => write!(f, "{} >= {}", l, r),
-            Operation::Add(l, r) => write!(f, "{} + {}", l, r),
+            Operation::Gt(l, r) => write!(f, "{l} > {r}"),
+            Operation::Lt(l, r) => write!(f, "{l} < {r}"),
+            Operation::Eq(l, r) => write!(f, "{l} == {r}"),
+            Operation::Neq(l, r) => write!(f, "{l} != {r}"),
+            Operation::Leq(l, r) => write!(f, "{l} <= {r}"),
+            Operation::Geq(l, r) => write!(f, "{l} >= {r}"),
+            Operation::Add(l, r) => write!(f, "{l} + {r}"),
         }
     }
 }
 
 impl Operation {
+    #[must_use]
     pub fn left(&self) -> Option<&Operand> {
         match self {
-            Operation::Gt(l, _) => Some(l),
-            Operation::Lt(l, _) => Some(l),
-            Operation::Eq(l, _) => Some(l),
-            Operation::Neq(l, _) => Some(l),
-            Operation::Leq(l, _) => Some(l),
-            Operation::Geq(l, _) => Some(l),
-            Operation::Add(l, _) => Some(l),
+            Operation::Gt(l, _)
+            | Operation::Lt(l, _)
+            | Operation::Eq(l, _)
+            | Operation::Neq(l, _)
+            | Operation::Leq(l, _)
+            | Operation::Geq(l, _)
+            | Operation::Add(l, _) => Some(l),
             Operation::ConstSelf => None,
         }
     }
+    #[must_use]
     pub fn right(&self) -> Option<&Operand> {
         match self {
-            Operation::Gt(_, r) => Some(r),
-            Operation::Lt(_, r) => Some(r),
-            Operation::Eq(_, r) => Some(r),
-            Operation::Neq(_, r) => Some(r),
-            Operation::Leq(_, r) => Some(r),
-            Operation::Geq(_, r) => Some(r),
-            Operation::Add(_, r) => Some(r),
+            Operation::Gt(_, r)
+            | Operation::Lt(_, r)
+            | Operation::Eq(_, r)
+            | Operation::Neq(_, r)
+            | Operation::Leq(_, r)
+            | Operation::Geq(_, r)
+            | Operation::Add(_, r) => Some(r),
             Operation::ConstSelf => None,
         }
     }
@@ -79,11 +81,18 @@ pub struct FuncInput {
     pub prefix: String,
     pub input: Vec<String>,
 }
-#[derive(Debug, Clone)]
+impl fmt::Display for FuncInput {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "({} {})", self.prefix, self.input.join(" "))
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Type {
     Bool,
     Int,
 }
+
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Operand {
@@ -95,9 +104,9 @@ pub enum Operand {
 impl fmt::Display for Operand {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Operand::Lit(i) => write!(f, "{}", i),
-            Operand::Var(v) => write!(f, "{}", v),
-            Operand::Infix(op) => write!(f, "({})", op),
+            Operand::Lit(i) => write!(f, "{i}"),
+            Operand::Var(v) => write!(f, "{v}"),
+            Operand::Infix(op) => write!(f, "({op})"),
         }
     }
 }

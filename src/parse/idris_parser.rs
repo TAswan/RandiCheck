@@ -8,12 +8,11 @@ pub fn collect_idris_adts(tree: &Tree, source_code: &str, verbose: bool) -> Adt 
 
     let adt_nodes = traverse_and_capture_from_node(root, "data");
     // let mut adts = Vec::new();
-    if adt_nodes.len() != 2 {
-        panic!(
-            "Expected exactly one ADT in the source file, found {}",
-            adt_nodes.len()
-        );
-    }
+    assert!(
+        (adt_nodes.len() == 2),
+        "Expected exactly one ADT in the source file, found {}",
+        adt_nodes.len()
+    );
 
     let adt_node = &adt_nodes[0];
 
@@ -29,7 +28,7 @@ pub fn collect_idris_adts(tree: &Tree, source_code: &str, verbose: bool) -> Adt 
     };
 
     if verbose {
-        println!("ADT Name: {}", name);
+        println!("ADT Name: {name}");
     }
 
     let cursor = &mut adt_node.walk();

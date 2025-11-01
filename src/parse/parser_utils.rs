@@ -46,15 +46,7 @@ pub fn print_node(node: &tree_sitter::Node, text: &str) {
 
 // prints the tree structure starting from the given node
 pub fn print_nodes(node: &tree_sitter::Node, depth: usize, text: &str, verbose: bool) {
-    if !verbose {
-        println!(
-            "{}Node: {} [{}-{}]",
-            "  ".repeat(depth),
-            node.kind(),
-            node.start_byte(),
-            node.end_byte()
-        )
-    } else {
+    if verbose {
         println!(
             "{}Node: {} [{}-{}] \n text: '{}' \n\n",
             "  ".repeat(depth),
@@ -62,6 +54,14 @@ pub fn print_nodes(node: &tree_sitter::Node, depth: usize, text: &str, verbose: 
             node.start_byte(),
             node.end_byte(),
             &text[node.start_byte()..node.end_byte()]
+        );
+    } else {
+        println!(
+            "{}Node: {} [{}-{}]",
+            "  ".repeat(depth),
+            node.kind(),
+            node.start_byte(),
+            node.end_byte()
         );
     }
     let mut child_cursor = node.walk();

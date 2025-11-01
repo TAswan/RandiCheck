@@ -1,4 +1,5 @@
 use core::panic;
+use std::io::Write;
 use std::{
     cell::RefCell,
     collections::HashMap,
@@ -8,39 +9,40 @@ use std::{
 
 use crate::adt::{Adt, Func, Operand};
 use conjure_cp_core::{
+    Model,
     ast::{Atom, DeclarationPtr, Domain, Expression, Literal, Metadata, Moo, Name, SymbolTable},
+    conjure_cp_core,
     context::Context,
     error::Error,
+    into_matrix_expr, range,
     rule_engine::{resolve_rule_sets, rewrite_naive},
     solver::{
         Solver, SolverFamily,
         adaptors::{self, Minion},
         states::ExecutionSuccess,
     },
-    *,
 };
 use ustr::Ustr;
 
-pub fn generate_oxide_output(adt: Adt, funcs: Vec<Func>, verbose: bool) -> String {
+pub fn generate_oxide_output(adt: &Adt, funcs: &[Func], verbose: bool) -> String {
     if verbose {
         println!("--- Generating Oxide Output ---");
         println!("--- ADT ---");
-        println!("{:#?}", adt);
+        println!("{adt:#?}");
         println!("--- Functions ---");
-        for f in &funcs {
-            println!("{:#?}", f);
+        for f in funcs {
+            println!("{f:#?}");
         }
     }
 
-    let model = create_model(adt, funcs, Default::default(), verbose);
+    let model = create_model(adt, funcs, Arc::default(), verbose);
 
     if verbose {
         println!("--- Generated Model ---");
         println!("{model}",);
     }
 
-    const DEFAULT_RULE_SETS: &[&str] = &[];
-    let rule_sets = resolve_rule_sets(SolverFamily::Minion, DEFAULT_RULE_SETS).unwrap();
+    let rule_sets = resolve_rule_sets(SolverFamily::Minion, &[]).unwrap();
 
     let model = rewrite_naive(&model, &rule_sets, true, false).unwrap();
     println!("Rewritten model: \n {model} \n",);
@@ -83,10 +85,10 @@ pub fn generate_oxide_output(adt: Adt, funcs: Vec<Func>, verbose: bool) -> Strin
             break;
         }
         println!("Solution {}:", i + 1);
-        for (k, v) in sols.iter() {
+        for (k, v) in sols {
             println!("  {k} = {v}");
         }
-        println!()
+        println!();
     }
     println!();
 
@@ -94,7 +96,6 @@ pub fn generate_oxide_output(adt: Adt, funcs: Vec<Func>, verbose: bool) -> Strin
 
     // write oxide specification to file
     let mut file = std::fs::File::create("output.oxide").expect("Could not create output file");
-    use std::io::Write;
     file.write_all(format!("{model}").as_bytes())
         .expect("Could not write to output file");
 
@@ -102,8 +103,8 @@ pub fn generate_oxide_output(adt: Adt, funcs: Vec<Func>, verbose: bool) -> Strin
 }
 
 fn create_model(
-    adt: Adt,
-    funcs: Vec<Func>,
+    adt: &Adt,
+    funcs: &[Func],
     context: Arc<RwLock<Context<'static>>>,
     verbose: bool,
 ) -> Model {
@@ -111,13 +112,13 @@ fn create_model(
     let submodel = model.as_submodel_mut();
 
     // Add ADT to model
-    parse_adt_to_model(&adt, &mut submodel.symbols_mut());
+    parse_adt_to_model(adt, &mut submodel.symbols_mut());
 
     let constraints: Vec<Expression> = funcs
         .iter()
         .map(|x| {
             convert_function(
-                adt.clone(),
+                adt,
                 x,
                 model.as_submodel_mut().symbols_ptr_unchecked(),
                 verbose,
@@ -135,7 +136,7 @@ fn parse_adt_to_model(adt: &Adt, symbols: &mut SymbolTable) {
     for con in cons {
         let con_name = con.prefix;
         for (i, t) in con.types.iter().enumerate() {
-            let var_name = format!("{}_{}", con_name, i);
+            let var_name = format!("{con_name}_{i}");
 
             let name = Name::User(Ustr::from(&var_name));
 
@@ -154,8 +155,8 @@ fn parse_adt_to_model(adt: &Adt, symbols: &mut SymbolTable) {
 
     // add tag variable
     let tag_name = Name::User(Ustr::from("tag"));
-    let cons_len = adt.constructors.len() as i32;
-    let tag_domain = Domain::Int([range!(1..cons_len)].to_vec());
+    let cons_len = adt.constructors.len();
+    let tag_domain = Domain::Int([range!(1..i32::try_from(cons_len).expect("overflow"))].to_vec());
     let _ = symbols
         .insert(DeclarationPtr::new_var(tag_name.clone(), tag_domain))
         .ok_or(Error::Parse(format!(
@@ -164,7 +165,7 @@ fn parse_adt_to_model(adt: &Adt, symbols: &mut SymbolTable) {
 }
 
 fn convert_function(
-    adt: Adt,
+    adt: &Adt,
     func: &Func,
     symbols: &Rc<RefCell<SymbolTable>>,
     verbose: bool,
@@ -191,7 +192,7 @@ fn convert_function(
     match &func.opp {
         crate::adt::Operation::ConstSelf => {
             let name = func.con.prefix.clone();
-            let prefix = Name::User(Ustr::from(&format!("{}_0", name))); // hard coding as a test TODO FIX
+            let prefix = Name::User(Ustr::from(&format!("{name}_0"))); // hard coding as a test TODO FIX
 
             let declaration: DeclarationPtr = symbols
                 .borrow()
@@ -224,8 +225,7 @@ fn convert_function(
                 Moo::new(Expression::Atomic(
                     Metadata::new(),
                     Atom::Literal(Literal::Int(
-                        ((prefixes.iter().position(|p| p == &func.con.prefix).unwrap()) as i64)
-                            .try_into()
+                        i32::try_from(prefixes.iter().position(|p| p == &func.con.prefix).unwrap())
                             .unwrap(),
                     )),
                 )),
@@ -236,12 +236,12 @@ fn convert_function(
         }
         crate::adt::Operation::Lt(l, r) => {
             if verbose {
-                println!("Converting Lt function: {:?}", func);
+                println!("Converting Lt function: {func:?}");
             }
             if let Operand::Var(_) = l {
                 let prefix = Name::User(Ustr::from(&format!("{}_0", func_con.prefix))); // hard coding as a test TODO FIX
 
-                println!("Prefix for Lt left operand: {:?}", prefix);
+                println!("Prefix for Lt left operand: {prefix:?}");
 
                 let declaration: DeclarationPtr = symbols
                     .borrow()
@@ -277,9 +277,10 @@ fn convert_function(
                     Moo::new(Expression::Atomic(
                         Metadata::new(),
                         Atom::Literal(Literal::Int(
-                            ((prefixes.iter().position(|p| p == &func.con.prefix).unwrap()) as i64)
-                                .try_into()
-                                .unwrap(),
+                            i32::try_from(
+                                prefixes.iter().position(|p| p == &func.con.prefix).unwrap(),
+                            )
+                            .unwrap(),
                         )),
                     )),
                 );
