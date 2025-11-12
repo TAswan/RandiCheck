@@ -50,6 +50,12 @@ pub fn generate_haskell_random(max_depth: u32, verbose: bool) {
     if verbose {
         println!("{code}");
     }
+
+    let path = "output.hs";
+    let mut file = std::fs::File::create(path).expect("Could not create output file");
+    use std::io::Write;
+    file.write_all(code.as_bytes())
+        .expect("Could not write to output file");
 }
 
 fn generate_adt(rng: &mut impl Rng, verbose: bool, max_depth: u32) -> Adt {

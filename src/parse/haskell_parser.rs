@@ -136,29 +136,39 @@ pub fn collect_haskell_functions(
 
         let mut input_cons: Vec<FuncInput> = Vec::new();
         for function in functions {
-            let constructors = traverse_and_capture_from_node(function, "constructor");
-            assert!((constructors.len() == 1), "expected only one constructor");
+            let patterns = traverse_and_capture_from_node(function, "patterns");
+
+            assert!(
+                (patterns.len() == 1),
+                "Expected exactly one patterns node in the function. Found {}",
+                patterns.len()
+            );
+
+            let pattern = &patterns[0];
+
+            let constructors = traverse_and_capture_from_node(*pattern, "constructor");
+            assert!(
+                (constructors.len() == 1),
+                "Expected exactly one constructor in the pattern"
+            );
             let constr_prefix =
                 &source_code[constructors[0].start_byte()..constructors[0].end_byte()];
 
-            let patterns = traverse_and_capture_from_node(function, "patterns");
-
             let mut input_strs = Vec::new();
-            for pattern in patterns {
-                let inputs = traverse_and_capture_from_node(pattern, "variable");
-                for input in &inputs {
-                    if verbose {
-                        println!(
-                            "Input: {}",
-                            &source_code[input.start_byte()..input.end_byte()]
-                        );
-                    }
-                    let input_str = &source_code[input.start_byte()..input.end_byte()];
-                    input_strs.push(input_str);
+            let inputs = traverse_and_capture_from_node(*pattern, "variable");
+            for input in &inputs {
+                if verbose {
+                    println!(
+                        "Input: {}",
+                        &source_code[input.start_byte()..input.end_byte()]
+                    );
                 }
-
-                input_strs.reverse();
+                let input_str = &source_code[input.start_byte()..input.end_byte()];
+                input_strs.push(input_str);
             }
+
+            input_strs.reverse(); // because they are captured in reverse order
+
             let con = FuncInput {
                 prefix: constr_prefix.to_string(),
                 input: input_strs.iter().map(|s| (*s).to_string()).collect(),
@@ -286,6 +296,17 @@ fn parse_operation(cursor: &mut TreeCursor<'_>, source_code: &str, verbose: bool
             print_node(&inner_node, source_code);
             print_nodes(&inner_node, 0, source_code, false);
             panic!("Parentheses not yet supported");
+        }
+        "constructor" => {
+            let constr_name = &source_code[child.start_byte()..child.end_byte()];
+            if constr_name == "True" {
+                Operation::BoolLit(true)
+            } else if constr_name == "False" {
+                Operation::BoolLit(false)
+            } else {
+                panic!("Unknown constructor: {constr_name}");
+            }
+
         }
 
         _ => panic!(
