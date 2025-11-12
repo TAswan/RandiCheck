@@ -4,6 +4,6 @@
 pub mod adt;
 pub mod generate;
 pub mod parse;
-pub mod randomGeneration;
+pub mod random_generation;
 pub mod solve;
 pub mod validate;

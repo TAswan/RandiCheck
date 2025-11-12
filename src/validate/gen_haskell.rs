@@ -20,6 +20,7 @@ struct FuncInput {
     opp: String,
 }
 
+#[must_use] 
 pub fn generate_haskell_validation(
     adt: Adt,
     funcs: Vec<Func>,
@@ -83,7 +84,7 @@ fn gen_predicate(funcs: Vec<Func>) -> Vec<FuncInput> {
     for func in funcs {
         let mut pred_code = String::new();
 
-        let _ = write!(pred_code, "{} \n", func.opp.to_haskell());
+        let _ = writeln!(pred_code, "{} ", func.opp.to_haskell());
 
         result.push(FuncInput {
             input: func.con.to_string(),
@@ -97,7 +98,7 @@ fn gen_value(adt: Adt, assignments: &Vec<(String, String)>, verbose: bool) -> As
     // generate haskell code for values
     let mut value_code = String::new();
 
-    let _ = write!(value_code, "value :: {}\n", adt.name);
+    let _ = writeln!(value_code, "value :: {}", adt.name);
 
     value_code.push_str("value = ");
     // find the value of the tag in the assignments
@@ -110,8 +111,7 @@ fn gen_value(adt: Adt, assignments: &Vec<(String, String)>, verbose: bool) -> As
 
     if verbose {
         println!(
-            "Generating Haskell value code for tag value: {}",
-            tag_value_int
+            "Generating Haskell value code for tag value: {tag_value_int}"
         );
     }
     // find the constructor corresponding to the tag value
@@ -137,8 +137,7 @@ fn gen_value(adt: Adt, assignments: &Vec<(String, String)>, verbose: bool) -> As
                 value.push_str("False ");
                 continue;
             }
-            let _ = write!(value_code, "{} ", val);
-            value.push_str(&format!("{} ", val));
+            let _ = write!(value_code, "{val} ");
         }
     }
 

@@ -41,7 +41,7 @@ pub fn generate_essence_output(adt: &Adt, funs: &[Func], verbose: bool) -> Strin
     path.to_string()
 }
 
-fn funtext(adt: &Adt, func: Func, verbose: bool) -> TeraFunc {
+fn funtext(adt: &Adt, func: Func, _verbose: bool) -> TeraFunc {
     let prefixes = adt
         .constructors
         .iter()
@@ -97,61 +97,61 @@ fn convert_variables(op: &Operation, func: Func) -> String {
         Operation::Add(x, y) => {
             let left = convert_variables(x, func.clone());
             let right = convert_variables(y, func.clone());
-            format!("{} + {}", left, right)
+            format!("{left} + {right}")
         }
         Operation::Gt(x, y) => {
             let left = convert_variables(x, func.clone());
             let right = convert_variables(y, func.clone());
-            format!("{} > {}", left, right)
+            format!("{left} > {right}")
         }
         Operation::Lt(x, y) => {
             let left = convert_variables(x, func.clone());
             let right = convert_variables(y, func.clone());
-            format!("{} < {}", left, right)
+            format!("{left} < {right}")
         }
         Operation::Eq(x, y) => {
             let left = convert_variables(x, func.clone());
             let right = convert_variables(y, func.clone());
-            format!("{} = {}", left, right)
+            format!("{left} = {right}")
         }
         Operation::Neq(x, y) => {
             let left = convert_variables(x, func.clone());
             let right = convert_variables(y, func.clone());
-            format!("{} != {}", left, right)
+            format!("{left} != {right}")
         }
         Operation::Leq(x, y) => {
             let left = convert_variables(x, func.clone());
             let right = convert_variables(y, func.clone());
-            format!("{} <= {}", left, right)
+            format!("{left} <= {right}")
         }
         Operation::Geq(x, y) => {
             let left = convert_variables(x, func.clone());
             let right = convert_variables(y, func.clone());
-            format!("{} >= {}", left, right)
+            format!("{left} >= {right}")
         }
         Operation::Sub(x, y) => {
             let left = convert_variables(x, func.clone());
             let right = convert_variables(y, func.clone());
-            format!("{} - {}", left, right)
+            format!("{left} - {right}")
         }
         Operation::Mul(x, y) => {
             let left = convert_variables(x, func.clone());
             let right = convert_variables(y, func.clone());
-            format!("{} * {}", left, right)
+            format!("{left} * {right}")
         }
         Operation::And(x, y) => {
             let left = convert_variables(x, func.clone());
             let right = convert_variables(y, func.clone());
-            format!("{} && {}", left, right)
+            format!("{left} && {right}")
         }
         Operation::Or(x, y) => {
             let left = convert_variables(x, func.clone());
             let right = convert_variables(y, func.clone());
-            format!("{} || {}", left, right)
+            format!("{left} || {right}")
         }
         Operation::Not(x) => {
             let val = convert_variables(x, func.clone());
-            format!("not {}", val)
+            format!("not {val}")
         }
 
         x => x.to_string(),

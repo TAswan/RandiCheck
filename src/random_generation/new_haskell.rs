@@ -1,5 +1,3 @@
-use core::num;
-
 // This module contains functions for generating random haskell code based on our ADTs and operations using tera
 use crate::adt::Adt;
 use crate::adt::Cons;
@@ -15,7 +13,7 @@ use tera::Context;
 use tera::Tera;
 
 #[derive(Debug, Serialize, Deserialize)]
-struct teraFunc {
+struct TeraFunc {
     con: FuncInput,
     opp: String,
 }
@@ -29,7 +27,7 @@ pub fn generate_haskell_random(max_depth: u32, verbose: bool) {
     let funcs = generate_func(&mut rng, &adt, func_depth, verbose);
 
     if verbose {
-        println!("Generated Functions: {:?}", funcs);
+        println!("Generated Functions: {funcs:?}");
     }
 
     let tera = Tera::new("src/templates/*.tera").unwrap();
@@ -37,9 +35,9 @@ pub fn generate_haskell_random(max_depth: u32, verbose: bool) {
 
     context.insert("adt", &adt);
 
-    let tera_funcs: Vec<teraFunc> = funcs
+    let tera_funcs: Vec<TeraFunc> = funcs
         .iter()
-        .map(|f| teraFunc {
+        .map(|f| TeraFunc {
             con: f.con.clone(),
             opp: f.opp.to_haskell(),
         })
@@ -81,7 +79,7 @@ fn generate_adt(rng: &mut impl Rng, verbose: bool, max_depth: u32) -> Adt {
     };
 
     if verbose {
-        println!("Generated ADT: {:?}", adt);
+        println!("Generated ADT: {adt:?}");
     }
 
     adt
@@ -131,13 +129,18 @@ fn generate_operation(
     constructor: &Cons,
     max_depth: u32,
     input: FuncInput,
-    returnType: crate::adt::Type,
+    return_type: crate::adt::Type,
 ) -> Operation {
+    if verbose {
+        println!(
+            "Generating operation with return type {return_type:?} at depth {max_depth}"
+        );
+    }
     if max_depth == 0 {
         //find all variables in the input with the return type
         let mut candidates = Vec::new();
         for (i, t) in constructor.types.iter().enumerate() {
-            if *t == returnType {
+            if *t == return_type {
                 candidates.push(input.input[i].clone());
             }
         }
@@ -148,13 +151,13 @@ fn generate_operation(
             return Operation::Var(selected.to_string());
         }
 
-        return match returnType {
+        return match return_type {
             crate::adt::Type::Bool => Operation::BoolLit(rng.random_bool(0.5)),
             crate::adt::Type::Int => Operation::IntLit(rng.random_range(1..=100)),
         };
     }
 
-    match returnType {
+    match return_type {
         crate::adt::Type::Bool => match rng.random_range(1..10) {
             1 => Operation::Neq(
                 Box::new(generate_operation(

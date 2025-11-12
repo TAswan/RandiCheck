@@ -1,5 +1,5 @@
 /// parses the solution output from Conjure
-
+#[must_use] 
 pub fn parse_essence_output(sol_path: &str, verbose: bool) -> Vec<(String, String)> {
     let solution = std::fs::read_to_string(sol_path).expect("Could not read solution file");
 
@@ -19,7 +19,7 @@ pub fn parse_essence_output(sol_path: &str, verbose: bool) -> Vec<(String, Strin
 
     for (var, val) in &assignments {
         if verbose {
-            println!("Parsed assignment: {} = {}", var, val);
+            println!("Parsed assignment: {var} = {val}");
         }
     }
 

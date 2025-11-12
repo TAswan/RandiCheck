@@ -35,7 +35,7 @@ fn main() {
     let generate = args.generate;
 
     if generate {
-        randi_check::randomGeneration::new_haskell::generate_haskell_random(6, verbose);
+        randi_check::random_generation::new_haskell::generate_haskell_random(6, verbose);
         return;
     }
 

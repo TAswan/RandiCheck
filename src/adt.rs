@@ -48,9 +48,9 @@ pub enum Operation {
 impl fmt::Display for Operation {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Operation::BoolLit(b) => write!(f, "{}", b),
-            Operation::IntLit(i) => write!(f, "{}", i),
-            Operation::Var(name) => write!(f, "{}", name),
+            Operation::BoolLit(b) => write!(f, "{b}"),
+            Operation::IntLit(i) => write!(f, "{i}"),
+            Operation::Var(name) => write!(f, "{name}"),
             Operation::Gt(l, r) => write!(f, "{l} > {r}"),
             Operation::Lt(l, r) => write!(f, "{l} < {r}"),
             Operation::Eq(l, r) => write!(f, "{l} == {r}"),
@@ -60,21 +60,22 @@ impl fmt::Display for Operation {
             Operation::Add(l, r) => write!(f, "{l} + {r}"),
             Operation::Sub(l, r) => write!(f, "{l} - {r}"),
             Operation::Mul(l, r) => write!(f, "{l} * {r}"),
-            Operation::And(l, r) => write!(f, "({} /\\ {})", l, r),
-            Operation::Or(l, r) => write!(f, "({} \\/ {})", l, r),
-            Operation::Not(o) => write!(f, "!({})", o),
+            Operation::And(l, r) => write!(f, "({l} /\\ {r})"),
+            Operation::Or(l, r) => write!(f, "({l} \\/ {r})"),
+            Operation::Not(o) => write!(f, "!({o})"),
         }
     }
 }
 impl Operation {
+    #[must_use] 
     pub fn to_haskell(&self) -> String {
         match self {
             Operation::BoolLit(b) => match b {
                 true => "True".to_string(),
                 false => "False".to_string(),
             },
-            Operation::IntLit(i) => format!("{}", i),
-            Operation::Var(name) => format!("{}", name),
+            Operation::IntLit(i) => format!("{i}"),
+            Operation::Var(name) => name.to_string(),
             Operation::Gt(l, r) => format!("{} > {}", l.to_haskell(), r.to_haskell()),
             Operation::Lt(l, r) => format!("{} < {}", l.to_haskell(), r.to_haskell()),
             Operation::Eq(l, r) => format!("{} == {}", l.to_haskell(), r.to_haskell()),
@@ -91,6 +92,7 @@ impl Operation {
     }
 
 
+    #[must_use] 
     pub fn is_infix(&self) -> bool {
         matches!(
             self,
@@ -108,6 +110,7 @@ impl Operation {
         )
     }
 
+    #[must_use] 
     pub fn left(&self) -> Option<&Operation> {
         match self {
             Operation::Gt(l, _) => Some(l),
@@ -124,6 +127,7 @@ impl Operation {
             _ => None,
         }
     }
+    #[must_use] 
     pub fn right(&self) -> Option<&Operation> {
         match self {
             Operation::Gt(_, r) => Some(r),
