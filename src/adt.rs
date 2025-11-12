@@ -67,7 +67,7 @@ impl fmt::Display for Operation {
     }
 }
 impl Operation {
-    #[must_use] 
+    #[must_use]
     pub fn to_haskell(&self) -> String {
         match self {
             Operation::BoolLit(b) => match b {
@@ -91,8 +91,7 @@ impl Operation {
         }
     }
 
-
-    #[must_use] 
+    #[must_use]
     pub fn is_infix(&self) -> bool {
         matches!(
             self,
@@ -110,7 +109,7 @@ impl Operation {
         )
     }
 
-    #[must_use] 
+    #[must_use]
     pub fn left(&self) -> Option<&Operation> {
         match self {
             Operation::Gt(l, _) => Some(l),
@@ -127,7 +126,7 @@ impl Operation {
             _ => None,
         }
     }
-    #[must_use] 
+    #[must_use]
     pub fn right(&self) -> Option<&Operation> {
         match self {
             Operation::Gt(_, r) => Some(r),

@@ -20,7 +20,7 @@ struct FuncInput {
     opp: String,
 }
 
-#[must_use] 
+#[must_use]
 pub fn generate_haskell_validation(
     adt: Adt,
     funcs: Vec<Func>,
@@ -110,9 +110,7 @@ fn gen_value(adt: Adt, assignments: &Vec<(String, String)>, verbose: bool) -> As
     let tag_value_int: i32 = tag_value.parse().unwrap();
 
     if verbose {
-        println!(
-            "Generating Haskell value code for tag value: {tag_value_int}"
-        );
+        println!("Generating Haskell value code for tag value: {tag_value_int}");
     }
     // find the constructor corresponding to the tag value
     // reverse the adt because of previous stack shenanigans

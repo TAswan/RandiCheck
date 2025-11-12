@@ -88,7 +88,7 @@ fn generate_adt(rng: &mut impl Rng, verbose: bool, max_depth: u32) -> Adt {
 fn generate_func(rng: &mut impl Rng, adt: &Adt, max_depth: u32, verbose: bool) -> Vec<Func> {
     let mut result = Vec::new();
 
-   /*  let num_inputs = match rng.random_range(1..6) != 3 {
+    /*  let num_inputs = match rng.random_range(1..6) != 3 {
         true => adt.constructors.len() as u32,
         false => rng.random_range(1..=adt.constructors.len() as u32),
     };*/
@@ -101,7 +101,11 @@ fn generate_func(rng: &mut impl Rng, adt: &Adt, max_depth: u32, verbose: bool) -
 
         for (i, _) in constructor.types.iter().enumerate() {
             // push a random letter as variable (changing size based on index to avoid duplicates)
-            input_values.push(rand::distr::Alphabetic.sample_string(rng, i + 1).to_lowercase());
+            input_values.push(
+                rand::distr::Alphabetic
+                    .sample_string(rng, i + 1)
+                    .to_lowercase(),
+            );
         }
 
         let con = crate::adt::FuncInput {
@@ -132,9 +136,7 @@ fn generate_operation(
     return_type: crate::adt::Type,
 ) -> Operation {
     if verbose {
-        println!(
-            "Generating operation with return type {return_type:?} at depth {max_depth}"
-        );
+        println!("Generating operation with return type {return_type:?} at depth {max_depth}");
     }
     if max_depth == 0 {
         //find all variables in the input with the return type

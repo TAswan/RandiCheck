@@ -5,3 +5,6 @@ dist-newstyle
 notes.md
 .z3-trace
 /conjure-output
+output.essence
+output.solution
+validation*

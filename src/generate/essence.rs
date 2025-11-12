@@ -14,7 +14,6 @@ pub fn generate_essence_output(adt: &Adt, funs: &[Func], verbose: bool) -> Strin
     let mut context = tera::Context::new();
 
     // the adt needs flipped because of stack nonsense
-    
 
     context.insert("adt", &adt);
     context.insert(
