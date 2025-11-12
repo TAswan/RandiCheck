@@ -1,0 +1,16 @@
+data D = {% for c in adt.constructors %}
+{% if not loop.first%} {{"|"}} {% endif %} {{ c.prefix }} {{ c.types | join(sep=" ")}}
+{%- endfor %}
+
+predicate :: D -> Bool
+{% for f in funcs %}
+predicate {{f.input}}  = {{ f.opp }}
+{% endfor %}
+
+value :: D
+value = {{assignments.var}} {{assignments.val}}
+
+
+main :: IO ()
+main = print(predicate value)
+

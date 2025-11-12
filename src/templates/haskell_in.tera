@@ -1,0 +1,8 @@
+data D = {% for c in adt.constructors %}
+{% if not loop.first%} {{"|"}} {% endif %} {{ c.prefix }} {{ c.types | join(sep=" ")}}
+{%- endfor %}
+
+predicate :: D -> Bool
+{% for f in funcs -%}
+predicate ({{f.con.prefix}} {{f.con.input | join(sep=" ")}})  = {{ f.opp }}
+{% endfor %}

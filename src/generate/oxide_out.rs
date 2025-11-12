@@ -199,7 +199,10 @@ fn convert_function(
                 .lookup(&prefix)
                 .expect("Could not find declaration for function input");
 
-            let name_expr = Expression::Atomic(Metadata::new(), Atom::Reference(declaration));
+            let name_expr = Expression::Atomic(
+                Metadata::new(),
+                Atom::Reference(conjure_cp_core::ast::Reference { ptr: declaration }),
+            );
 
             //right now const self just assumes boolean true, later this should be extended to be a general constant
             let const_self =
@@ -220,7 +223,9 @@ fn convert_function(
                 Metadata::new(),
                 Moo::new(Expression::Atomic(
                     Metadata::new(),
-                    Atom::Reference(tag_declaration),
+                    Atom::Reference(conjure_cp_core::ast::Reference {
+                        ptr: tag_declaration,
+                    }),
                 )),
                 Moo::new(Expression::Atomic(
                     Metadata::new(),
@@ -248,7 +253,10 @@ fn convert_function(
                     .lookup(&prefix)
                     .expect("Could not find declaration for function input");
 
-                let name_expr = Expression::Atomic(Metadata::new(), Atom::Reference(declaration));
+                let name_expr = Expression::Atomic(
+                    Metadata::new(),
+                    Atom::Reference(conjure_cp_core::ast::Reference { ptr: declaration }),
+                );
 
                 let const_lit = match r {
                     Operand::Lit(i) => Literal::Int(*i),
@@ -272,7 +280,9 @@ fn convert_function(
                     Metadata::new(),
                     Moo::new(Expression::Atomic(
                         Metadata::new(),
-                        Atom::Reference(tag_declaration),
+                        Atom::Reference(conjure_cp_core::ast::Reference {
+                            ptr: tag_declaration,
+                        }),
                     )),
                     Moo::new(Expression::Atomic(
                         Metadata::new(),

@@ -1,6 +1,6 @@
 use tree_sitter::Tree;
 
-use crate::adt::{Adt, Cons, Func, FuncInput, Operand, Operation, Type};
+use crate::adt::{Adt, Cons, Func, FuncInput, Operation, Type};
 use crate::parse::parser_utils::{print_nodes, traverse_and_capture_from_node};
 
 pub fn collect_rust_adts(tree: &Tree, source_code: &str, verbose: bool) -> Adt {
@@ -165,7 +165,7 @@ pub fn collect_rust_functions(
                 // create Func with ConstSelf
                 let func = Func {
                     con: func_input,
-                    opp: Operation::ConstSelf,
+                    opp: Operation::Var(value),
                 };
                 funcs.push(func);
             }
@@ -188,22 +188,22 @@ pub fn collect_rust_functions(
                         "Left: {left_value}, Operator: {operator_value}, Right: {right_value}"
                     );
                 }
-                let left_operand = Operand::Var(left_value);
+                let left_operand = Operation::Var(left_value);
 
                 let right_operand = if let Ok(n) = right_value.parse::<i32>() {
-                    Operand::Lit(n)
+                    Operation::IntLit(n)
                 } else {
-                    Operand::Var(right_value)
+                    Operation::Var(right_value)
                 };
 
                 let operation = match operator_value.as_str() {
-                    "+" => Operation::Add(left_operand, right_operand),
-                    ">" => Operation::Gt(left_operand, right_operand),
-                    "<" => Operation::Lt(left_operand, right_operand),
-                    "==" => Operation::Eq(left_operand, right_operand),
-                    "!=" => Operation::Neq(left_operand, right_operand),
-                    ">=" => Operation::Geq(left_operand, right_operand),
-                    "<=" => Operation::Leq(left_operand, right_operand),
+                    "+" => Operation::Add(Box::new(left_operand), Box::new(right_operand)),
+                    ">" => Operation::Gt(Box::new(left_operand), Box::new(right_operand)),
+                    "<" => Operation::Lt(Box::new(left_operand), Box::new(right_operand)),
+                    "==" => Operation::Eq(Box::new(left_operand), Box::new(right_operand)),
+                    "!=" => Operation::Neq(Box::new(left_operand), Box::new(right_operand)),
+                    ">=" => Operation::Geq(Box::new(left_operand), Box::new(right_operand)),
+                    "<=" => Operation::Leq(Box::new(left_operand), Box::new(right_operand)),
                     _ => panic!("Unsupported operator: {operator_value}"),
                 };
 

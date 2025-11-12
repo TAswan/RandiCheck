@@ -1,6 +1,6 @@
 use tree_sitter::Tree;
 
-use crate::adt::{Adt, Cons, Func, FuncInput, Operand, Operation, Type};
+use crate::adt::{Adt, Cons, Func, FuncInput, Operation, Type};
 use crate::parse::parser_utils::{
     print_node, print_nodes, traverse_and_capture, traverse_and_capture_from_node,
 };
@@ -61,7 +61,7 @@ pub fn collect_haskell_adts(tree: &Tree, source_code: &str, verbose: bool) -> Ad
             };
             type_vec.push(ty);
         }
-
+        type_vec.reverse();
         let cons = Cons {
             prefix: prefix_str.to_string(),
             types: type_vec,
@@ -215,19 +215,17 @@ fn parse_operation(node: tree_sitter::Node, source_code: &str, verbose: bool) ->
         let mut is_infix = false;
         // check if left and right operands are also infix in case we have to fix precedence
         if let (Some(left), Some(right)) = (infix.left(), infix.right()) {
-            if let Operand::Infix(left_infix) = left {
+            if left.is_infix() {
                 if verbose {
-                    println!("Left operand is an infix: {left_infix:?}");
+                    println!("Left operand is an infix: {left:?}");
                 }
                 is_infix = true;
-                // Here you would implement precedence handling if needed
             }
-            if let Operand::Infix(right_infix) = right {
+            if right.is_infix() {
                 if verbose {
-                    println!("Right operand is an infix: {right_infix:?}");
+                    println!("Right operand is an infix: {right:?}");
                 }
                 is_infix = true;
-                // Here you would implement precedence handling if needed
             }
         }
 
@@ -243,20 +241,37 @@ fn parse_operation(node: tree_sitter::Node, source_code: &str, verbose: bool) ->
         panic!("Unexpected additional nodes in operation");
     }
 
-    Operation::ConstSelf
+    parse_operand(child, source_code)
 }
 
-fn parse_operand(node: tree_sitter::Node, source_code: &str) -> Operand {
+fn parse_operand(node: tree_sitter::Node, source_code: &str) -> Operation {
     match node.kind() {
         "literal" => {
             let val = &source_code[node.start_byte()..node.end_byte()];
-            Operand::Lit(val.parse::<i32>().unwrap())
+            Operation::IntLit(val.parse::<i32>().unwrap())
         }
         "variable" | "name" => {
             let name = &source_code[node.start_byte()..node.end_byte()];
-            Operand::Var(name.to_string())
+            if name == "True" {
+                Operation::BoolLit(true)
+            } else if name == "False" {
+                Operation::BoolLit(false)
+            } else {
+                Operation::Var(name.to_string())
+            }
         }
-        _ => panic!("Unknown operand kind: {}", node.kind()),
+        "parens" => {
+            let mut child_cursor = node.walk();
+            child_cursor.goto_first_child(); // go to '('
+            child_cursor.goto_next_sibling(); // go to inner expression
+            let inner_node = child_cursor.node();
+            print_node(&inner_node, source_code);
+            print_nodes(&inner_node, 0, source_code, false);
+            panic!("Parentheses not yet supported");
+        }
+
+
+        _ => panic!("Unknown operand kind: {}, {:?}", node.kind(), print_nodes(&node, 0, source_code, false) ),
     }
 }
 
@@ -272,9 +287,9 @@ fn parse_infix(node: tree_sitter::Node, source_code: &str) -> Operation {
                 "infix" => {
                     let infix = parse_infix(child, source_code);
                     if left.is_none() {
-                        left = Some(Operand::Infix(Box::new(infix)));
+                        left = Some(Box::new(infix));
                     } else {
-                        right = Some(Operand::Infix(Box::new(infix)));
+                        right = Some(Box::new(infix));
                     }
                 }
                 "operator" => {
@@ -284,9 +299,9 @@ fn parse_infix(node: tree_sitter::Node, source_code: &str) -> Operation {
                 _ => {
                     let operand = parse_operand(child, source_code);
                     if left.is_none() {
-                        left = Some(operand);
+                        left = Some(Box::new(operand));
                     } else {
-                        right = Some(operand);
+                        right = Some(Box::new(operand));
                     }
                 }
             }
@@ -304,6 +319,10 @@ fn parse_infix(node: tree_sitter::Node, source_code: &str) -> Operation {
             "<=" => Operation::Leq(left_op, right_op),
             ">=" => Operation::Geq(left_op, right_op),
             "+" => Operation::Add(left_op, right_op),
+            "-" => Operation::Sub(left_op, right_op),
+            "*" => Operation::Mul(left_op, right_op),   
+            "&&" => Operation::And(left_op, right_op),
+            "||" => Operation::Or(left_op, right_op), 
             _ => panic!("Unknown operator: {operator}"),
         }
     } else {
@@ -328,72 +347,80 @@ fn precedence_swap(infix: Operation) -> Operation {
         | Operation::Neq(l, r)
         | Operation::Leq(l, r)
         | Operation::Geq(l, r)
-        | Operation::Add(l, r) => (l.clone(), r.clone()),
+        | Operation::Add(l, r)
+        | Operation::Sub(l, r)
+        | Operation::Mul(l, r)
+        | Operation::And(l, r)
+        | Operation::Or(l, r)
+         => (l.clone(), r.clone()),
         _ => return infix,
     };
-    if let Operand::Infix(boxed_right_infix) = right_op {
-        let right_precedence = precedence(&(*boxed_right_infix).clone());
-        let current_precedence = precedence(&infix.clone());
-        if right_precedence > current_precedence {
-            // we need to swap
-            // extract the left and right operands of the right infix
-            let (right_left_op, right_right_op) = match &*boxed_right_infix {
-                Operation::Gt(l, r)
-                | Operation::Lt(l, r)
-                | Operation::Eq(l, r)
-                | Operation::Neq(l, r)
-                | Operation::Leq(l, r)
-                | Operation::Geq(l, r)
-                | Operation::Add(l, r) => (l.clone(), r.clone()),
-                _ => return infix,
-            };
 
-            // create new infix for the current operation with left_op and right_left_op
-            let new_current_infix = match &infix {
-                Operation::Gt(_, _) => Operation::Gt(left_op, right_left_op),
-                Operation::Lt(_, _) => Operation::Lt(left_op, right_left_op),
-                Operation::Eq(_, _) => Operation::Eq(left_op, right_left_op),
-                Operation::Neq(_, _) => Operation::Neq(left_op, right_left_op),
-                Operation::Leq(_, _) => Operation::Leq(left_op, right_left_op),
-                Operation::Geq(_, _) => Operation::Geq(left_op, right_left_op),
-                Operation::Add(_, _) => Operation::Add(left_op, right_left_op),
-                _ => return infix,
-            };
+    let right_precedence = precedence(&(*right_op).clone());
+    let current_precedence = precedence(&infix.clone());
+    if right_precedence > current_precedence {
+        // we need to swap
+        // extract the left and right operands of the right infix
+        let (right_left_op, right_right_op) = match &*right_op {
+            Operation::Gt(l, r)
+            | Operation::Lt(l, r)
+            | Operation::Eq(l, r)
+            | Operation::Neq(l, r)
+            | Operation::Leq(l, r)
+            | Operation::Geq(l, r)
+            | Operation::Add(l, r) 
+            | Operation::Sub(l, r)
+            | Operation::Mul(l, r)
+            | Operation::And(l, r)
+            | Operation::Or(l, r)
+            => (l.clone(), r.clone()),
+            _ => return infix,
+        };
 
-            // now create new infix for the right operation with new_current_infix and right_right_op
-            let new_infix = match &*boxed_right_infix {
-                Operation::Gt(_, _) => {
-                    Operation::Gt(Operand::Infix(Box::new(new_current_infix)), right_right_op)
-                }
-                Operation::Lt(_, _) => {
-                    Operation::Lt(Operand::Infix(Box::new(new_current_infix)), right_right_op)
-                }
-                Operation::Eq(_, _) => {
-                    Operation::Eq(Operand::Infix(Box::new(new_current_infix)), right_right_op)
-                }
-                Operation::Neq(_, _) => {
-                    Operation::Neq(Operand::Infix(Box::new(new_current_infix)), right_right_op)
-                }
-                Operation::Leq(_, _) => {
-                    Operation::Leq(Operand::Infix(Box::new(new_current_infix)), right_right_op)
-                }
-                Operation::Geq(_, _) => {
-                    Operation::Geq(Operand::Infix(Box::new(new_current_infix)), right_right_op)
-                }
-                Operation::Add(_, _) => {
-                    Operation::Add(Operand::Infix(Box::new(new_current_infix)), right_right_op)
-                }
-                _ => return infix,
-            };
-            return new_infix;
-        }
+        // create new infix for the current operation with left_op and right_left_op
+        let new_current_infix = match &infix {
+            Operation::Gt(_, _) => Operation::Gt(left_op, right_left_op),
+            Operation::Lt(_, _) => Operation::Lt(left_op, right_left_op),
+            Operation::Eq(_, _) => Operation::Eq(left_op, right_left_op),
+            Operation::Neq(_, _) => Operation::Neq(left_op, right_left_op),
+            Operation::Leq(_, _) => Operation::Leq(left_op, right_left_op),
+            Operation::Geq(_, _) => Operation::Geq(left_op, right_left_op),
+            Operation::Add(_, _) => Operation::Add(left_op, right_left_op),
+            Operation::Sub(_, _) => Operation::Sub(left_op, right_left_op),
+            Operation::Mul(_, _) => Operation::Mul(left_op, right_left_op),
+            Operation::And(_, _) => Operation::And(left_op, right_left_op),
+            Operation::Or(_, _) => Operation::Or(left_op, right_left_op),
+            _ => return infix,
+        };
+
+        // now create new infix for the right operation with new_current_infix and right_right_op
+        let new_infix = match &*right_op {
+            Operation::Gt(_, _) => Operation::Gt(Box::new(new_current_infix), right_right_op),
+            Operation::Lt(_, _) => Operation::Lt(Box::new(new_current_infix), right_right_op),
+            Operation::Eq(_, _) => Operation::Eq(Box::new(new_current_infix), right_right_op),
+            Operation::Neq(_, _) => Operation::Neq(Box::new(new_current_infix), right_right_op),
+            Operation::Leq(_, _) => Operation::Leq(Box::new(new_current_infix), right_right_op),
+            Operation::Geq(_, _) => Operation::Geq(Box::new(new_current_infix), right_right_op),
+            Operation::Add(_, _) => Operation::Add(Box::new(new_current_infix), right_right_op),
+            Operation::Sub(_, _) => Operation::Sub(Box::new(new_current_infix), right_right_op),
+            Operation::Mul(_, _) => Operation::Mul(Box::new(new_current_infix), right_right_op),
+            Operation::And(_, _) => Operation::And(Box::new(new_current_infix), right_right_op),
+            Operation::Or(_, _) => Operation::Or(Box::new(new_current_infix), right_right_op),
+            _ => return infix,
+        };
+        return new_infix;
     }
+
     infix
 }
 
 fn precedence(op: &Operation) -> u8 {
     match op {
         Operation::Add(_, _) => 1,
+        Operation::Sub(_, _) => 1,
+        Operation::Mul(_, _) => 2,
+        Operation::And(_, _) => 3,
+        Operation::Or(_, _) => 3,
         Operation::Gt(_, _)
         | Operation::Lt(_, _)
         | Operation::Eq(_, _)

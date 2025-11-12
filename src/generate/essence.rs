@@ -1,21 +1,31 @@
-use core::panic;
-use std::fmt::Write as _;
+use serde::{Deserialize, Serialize};
 use std::io::Write;
-
 // This module takes in the parsed haskell AST and outputs an Essence specification as raw text.
-use crate::adt::{Adt, Func, Operand, Operation, Type};
+use crate::adt::{Adt, Func, Operation, Type};
+
+#[derive(Debug, Serialize, Deserialize)]
+struct TeraFunc {
+    input: String,
+    nons: Vec<String>,
+}
 
 pub fn generate_essence_output(adt: &Adt, funs: &[Func], verbose: bool) -> String {
-    let mut essence_spec = String::new();
+    let tera = tera::Tera::new("src/templates/*.tera").unwrap();
+    let mut context = tera::Context::new();
 
-    essence_spec.push_str("language Essence 1.3\n\n");
+    // the adt needs flipped because of stack nonsense
+    
 
-    essence_spec.push_str(&adtext(adt));
+    context.insert("adt", &adt);
+    context.insert(
+        "funcs",
+        &funs
+            .iter()
+            .map(|f| funtext(adt, f.clone(), verbose))
+            .collect::<Vec<TeraFunc>>(),
+    );
 
-    essence_spec.push_str("\n\n");
-    essence_spec.push_str("such that\n\n");
-
-    essence_spec.push_str(&funtext(adt, funs, verbose));
+    let essence_spec = tera.render("essence.tera", &context).unwrap();
 
     if verbose {
         println!("--- Generated Essence Specification ---");
@@ -31,188 +41,119 @@ pub fn generate_essence_output(adt: &Adt, funs: &[Func], verbose: bool) -> Strin
     path.to_string()
 }
 
-fn adtext(adt: &Adt) -> String {
-    let mut str = String::new();
-    let len = adt.constructors.len();
-
-    for con in &adt.constructors {
-        for (i, t) in con.types.iter().enumerate() {
-            let _ = write!(str, "find {}_{} : ", con.prefix, i);
-
-            match t {
-                Type::Int => {
-                    // For simplicity, we assume all integers are in the range 1 to 5
-                    str.push_str("int(1..5)\n");
-                }
-                Type::Bool => {
-                    str.push_str("bool\n");
-                }
-            }
-        }
-    }
-
-    let _ = write!(str, "find tag : int(1..{len})");
-
-    str
-}
-fn funtext(adt: &Adt, funs: &[Func], verbose: bool) -> String {
-    let mut str = String::new();
-
+fn funtext(adt: &Adt, func: Func, verbose: bool) -> TeraFunc {
     let prefixes = adt
         .constructors
         .iter()
         .map(|c| c.prefix.clone())
         .collect::<Vec<String>>();
-    for f in funs {
-        // check the function's input constructor is in the Adt constructors
-        assert!(
-            prefixes.contains(&f.con.prefix),
-            "Function input constructor {} not in Adt constructors {:?}",
-            f.con.prefix,
-            prefixes
-        );
-        // get the list of constructors that are not the function's input constructor
-        let not_prefixes = prefixes
-            .iter()
-            .filter(|p| *p != &f.con.prefix)
-            .collect::<Vec<&String>>();
 
-        // Find the constructor for the function
-        let func_con = adt
-            .constructors
-            .iter()
-            .find(|c| c.prefix == f.con.prefix)
-            .unwrap();
-        let str_op = match &f.opp {
-            Operation::ConstSelf | Operation::Eq(_, _) => "=",
-            Operation::Gt(_, _) => ">",
-            Operation::Lt(_, _) => "<",
-            Operation::Neq(_, _) => "!=",
-            Operation::Leq(_, _) => "<=",
-            Operation::Geq(_, _) => ">=",
-            Operation::Add(_, _) => "+",
-        };
-        let (l, r) = match &f.opp {
-            Operation::Gt(l, r)
-            | Operation::Lt(l, r)
-            | Operation::Eq(l, r)
-            | Operation::Neq(l, r)
-            | Operation::Leq(l, r)
-            | Operation::Geq(l, r)
-            | Operation::Add(l, r) => (l, r),
-            //dummy values
-            Operation::ConstSelf => (&Operand::Lit(0), &Operand::Lit(0)),
-        };
-        if verbose {
-            println!("{func_con:?}");
-            println!("{f:?}");
-        }
-        // if the operation is ConstSelf then we only have to set the variable = to true
-        if let Operation::ConstSelf = &f.opp {
-            let _ = write!(
-                str,
-                "({}_{} = true /\\ tag = {})",
-                f.con.prefix,
-                // very bad, fix later
-                0,
-                prefixes.iter().position(|p| p == &f.con.prefix).unwrap() + 1
-            );
+    // check the function's input constructor is in the Adt constructors
+    assert!(
+        prefixes.contains(&func.con.prefix),
+        "Function input constructor {} not in Adt constructors {:?}",
+        func.con.prefix,
+        prefixes
+    );
 
-            // if not the last function, add a newline
-            if f != funs.last().unwrap() {
-                str.push_str("\n \\/");
-            }
-            continue;
-        }
+    let str_op = convert_variables(&func.opp, func.clone());
 
-        str.push('(');
-        // handle left operand
-        str.push_str(&operand_str(l.clone(), f));
-
-        // add the operator
-        let _ = write!(str, " {str_op} ");
-        // handle right operand
-        str.push_str(&operand_str(r.clone(), f));
-        str.push(')');
-
-        let _ = write!(
-            str,
-            " /\\ tag = {}",
-            prefixes.iter().position(|p| p == &f.con.prefix).unwrap() + 1
-        );
-
-        for np in &not_prefixes {
-            let con = adt.constructors.iter().find(|c| &c.prefix == *np).unwrap();
-            for (j, t) in con.types.iter().enumerate() {
-                match t {
-                    Type::Int => {
-                        let _ = write!(str, " /\\ {}_{} = 1", con.prefix, j);
-                    }
-                    Type::Bool => {
-                        let _ = write!(str, " /\\ {}_{} = false", con.prefix, j);
-                    }
+    let not_prefixes = prefixes
+        .iter()
+        .filter(|p| *p != &func.con.prefix)
+        .collect::<Vec<&String>>();
+    let mut nons = Vec::new();
+    for np in &not_prefixes {
+        let con = adt.constructors.iter().find(|c| &c.prefix == *np).unwrap();
+        for (j, t) in con.types.iter().enumerate() {
+            match t {
+                Type::Int => {
+                    nons.push(format!(" {}_{} = 1", con.prefix, j + 1));
+                }
+                Type::Bool => {
+                    nons.push(format!(" {}_{} = false", con.prefix, j + 1));
                 }
             }
         }
-
-        // if not the last function, add a newline
-        if f != funs.last().unwrap() {
-            str.push_str("\n \\/");
-        }
     }
 
-    str
-}
-
-fn infix_str(infix: Box<Operation>, func_input: &Func) -> String {
-    match *infix {
-        Operation::Gt(l, r) => format!(
-            "({} > {})",
-            operand_str(l, func_input),
-            operand_str(r, func_input)
-        ),
-        Operation::Lt(l, r) => format!(
-            "({} < {})",
-            operand_str(l, func_input),
-            operand_str(r, func_input)
-        ),
-        Operation::Eq(l, r) => format!(
-            "({} = {})",
-            operand_str(l, func_input),
-            operand_str(r, func_input)
-        ),
-        Operation::Neq(l, r) => format!(
-            "({} != {})",
-            operand_str(l, func_input),
-            operand_str(r, func_input)
-        ),
-        Operation::Leq(l, r) => format!(
-            "({} <= {})",
-            operand_str(l, func_input),
-            operand_str(r, func_input)
-        ),
-        Operation::Geq(l, r) => format!(
-            "({} >= {})",
-            operand_str(l, func_input),
-            operand_str(r, func_input)
-        ),
-        Operation::Add(l, r) => format!(
-            "({} + {})",
-            operand_str(l, func_input),
-            operand_str(r, func_input)
-        ),
-        _ => panic!("Unsupported infix operation {:?}", infix),
+    TeraFunc {
+        input: str_op,
+        nons,
     }
 }
 
-fn operand_str(op: Operand, func_input: &Func) -> String {
+fn convert_variables(op: &Operation, func: Func) -> String {
     match op {
-        Operand::Lit(i) => format!("{i}"),
-        Operand::Var(s) => {
-            // get the index of the function input that matches the string
-            let index = func_input.con.input.iter().position(|t| t == &s).unwrap();
-            format!("{}_{}", func_input.con.prefix, index)
+        Operation::Var(name) => {
+            let index = func
+                .con
+                .input
+                .iter()
+                .position(|n| n == name)
+                .expect("Variable name not found in function input");
+            format!("{}_{}", func.con.prefix, index + 1)
         }
-        Operand::Infix(i) => infix_str(Box::new(*i), func_input),
+        Operation::Add(x, y) => {
+            let left = convert_variables(x, func.clone());
+            let right = convert_variables(y, func.clone());
+            format!("{} + {}", left, right)
+        }
+        Operation::Gt(x, y) => {
+            let left = convert_variables(x, func.clone());
+            let right = convert_variables(y, func.clone());
+            format!("{} > {}", left, right)
+        }
+        Operation::Lt(x, y) => {
+            let left = convert_variables(x, func.clone());
+            let right = convert_variables(y, func.clone());
+            format!("{} < {}", left, right)
+        }
+        Operation::Eq(x, y) => {
+            let left = convert_variables(x, func.clone());
+            let right = convert_variables(y, func.clone());
+            format!("{} = {}", left, right)
+        }
+        Operation::Neq(x, y) => {
+            let left = convert_variables(x, func.clone());
+            let right = convert_variables(y, func.clone());
+            format!("{} != {}", left, right)
+        }
+        Operation::Leq(x, y) => {
+            let left = convert_variables(x, func.clone());
+            let right = convert_variables(y, func.clone());
+            format!("{} <= {}", left, right)
+        }
+        Operation::Geq(x, y) => {
+            let left = convert_variables(x, func.clone());
+            let right = convert_variables(y, func.clone());
+            format!("{} >= {}", left, right)
+        }
+        Operation::Sub(x, y) => {
+            let left = convert_variables(x, func.clone());
+            let right = convert_variables(y, func.clone());
+            format!("{} - {}", left, right)
+        }
+        Operation::Mul(x, y) => {
+            let left = convert_variables(x, func.clone());
+            let right = convert_variables(y, func.clone());
+            format!("{} * {}", left, right)
+        }
+        Operation::And(x, y) => {
+            let left = convert_variables(x, func.clone());
+            let right = convert_variables(y, func.clone());
+            format!("{} && {}", left, right)
+        }
+        Operation::Or(x, y) => {
+            let left = convert_variables(x, func.clone());
+            let right = convert_variables(y, func.clone());
+            format!("{} || {}", left, right)
+        }
+        Operation::Not(x) => {
+            let val = convert_variables(x, func.clone());
+            format!("not {}", val)
+        }
+
+        x => x.to_string(),
     }
 }
