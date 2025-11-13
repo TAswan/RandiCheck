@@ -221,48 +221,26 @@ fn parse_operation(cursor: &mut TreeCursor<'_>, source_code: &str, verbose: bool
             let mut right = None;
             let mut op = None;
             if cursor.goto_first_child() {
-                loop {
-                    let child = cursor.node();
-                    match child.kind() {
-                        "infix" => {
-                            let infix = parse_operation(cursor, source_code, verbose);
-                            if left.is_none() {
-                                left = Some(Box::new(infix));
-                            } else {
-                                right = Some(Box::new(infix));
-                            }
-                        }
-                        "operator" => {
-                            let operator = &source_code[child.start_byte()..child.end_byte()];
-                            op = Some(operator.to_string());
-                        }
-                        _ => {
-                            let operand = parse_operation(cursor, source_code, verbose);
-                            if left.is_none() {
-                                left = Some(Box::new(operand));
-                            } else {
-                                right = Some(Box::new(operand));
-                            }
-                        }
-                    }
-                    if !cursor.goto_next_sibling() {
-                        break;
-                    }
-                }
+                left = Some(parse_operation(&mut cursor.clone(), source_code, verbose));
+                cursor.goto_next_sibling();
+                op = Some(&source_code[cursor.node().start_byte()..cursor.node().end_byte()]);
+                cursor.goto_next_sibling();
+                right = Some(parse_operation(&mut cursor.clone(), source_code, verbose));
             }
+
             if let (Some(left_op), Some(right_op), Some(operator)) = (left, right, op) {
-                match operator.as_str() {
-                    ">" => Operation::Gt(left_op, right_op),
-                    "<" => Operation::Lt(left_op, right_op),
-                    "==" => Operation::Eq(left_op, right_op),
-                    "/=" => Operation::Neq(left_op, right_op),
-                    "<=" => Operation::Leq(left_op, right_op),
-                    ">=" => Operation::Geq(left_op, right_op),
-                    "+" => Operation::Add(left_op, right_op),
-                    "-" => Operation::Sub(left_op, right_op),
-                    "*" => Operation::Mul(left_op, right_op),
-                    "&&" => Operation::And(left_op, right_op),
-                    "||" => Operation::Or(left_op, right_op),
+                match operator {
+                    ">" => Operation::Gt(Box::new(left_op), Box::new(right_op)),
+                    "<" => Operation::Lt(Box::new(left_op), Box::new(right_op)),
+                    "==" => Operation::Eq(Box::new(left_op), Box::new(right_op)),
+                    "/=" => Operation::Neq(Box::new(left_op), Box::new(right_op)),
+                    "<=" => Operation::Leq(Box::new(left_op), Box::new(right_op)),
+                    ">=" => Operation::Geq(Box::new(left_op), Box::new(right_op)),
+                    "+" => Operation::Add(Box::new(left_op), Box::new(right_op)),
+                    "-" => Operation::Sub(Box::new(left_op), Box::new(right_op)),
+                    "*" => Operation::Mul(Box::new(left_op), Box::new(right_op)),
+                    "&&" => Operation::And(Box::new(left_op), Box::new(right_op)),
+                    "||" => Operation::Or(Box::new(left_op), Box::new(right_op)),
                     _ => panic!("Unknown operator: {operator}"),
                 }
             } else {
@@ -295,7 +273,7 @@ fn parse_operation(cursor: &mut TreeCursor<'_>, source_code: &str, verbose: bool
             let inner_node = cursor.node();
             print_node(&inner_node, source_code);
             print_nodes(&inner_node, 0, source_code, false);
-            panic!("Parentheses not yet supported");
+            parse_operation(cursor, source_code, verbose)
         }
         "constructor" => {
             let constr_name = &source_code[child.start_byte()..child.end_byte()];
@@ -306,7 +284,6 @@ fn parse_operation(cursor: &mut TreeCursor<'_>, source_code: &str, verbose: bool
             } else {
                 panic!("Unknown constructor: {constr_name}");
             }
-
         }
 
         _ => panic!(

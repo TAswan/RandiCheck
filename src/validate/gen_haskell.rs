@@ -96,11 +96,7 @@ fn gen_predicate(funcs: Vec<Func>) -> Vec<FuncInput> {
 
 fn gen_value(adt: Adt, assignments: &Vec<(String, String)>, verbose: bool) -> Assignments {
     // generate haskell code for values
-    let mut value_code = String::new();
 
-    let _ = writeln!(value_code, "value :: {}", adt.name);
-
-    value_code.push_str("value = ");
     // find the value of the tag in the assignments
     let tag_value = assignments
         .iter()
@@ -120,27 +116,25 @@ fn gen_value(adt: Adt, assignments: &Vec<(String, String)>, verbose: bool) -> As
     };
 
     let constructor = &adt.constructors[(tag_value_int - 1) as usize];
-    let _ = write!(value_code, "{} ", constructor.prefix);
-
+    if verbose {
+        println!("Using constructor: {}", constructor.prefix);
+    }
     let mut value = String::new();
     // find the value of each field in the assignments where the variable name begins with the constructor prefix
     for (var, val) in assignments {
         if var.starts_with(&constructor.prefix) {
+            if verbose {
+                println!("Processing field assignment: {} = {}", var, val);
+            }
             if val == "true" {
-                let _ = write!(value_code, "True ");
                 value.push_str("True ");
                 continue;
             } else if val == "false" {
-                let _ = write!(value_code, "False ");
                 value.push_str("False ");
                 continue;
             }
-            let _ = write!(value_code, "{val} ");
+            value.push_str(&format!("{val} "));
         }
-    }
-
-    if verbose {
-        println!("Generated Haskell value code:\n{}", &value_code);
     }
 
     Assignments {
