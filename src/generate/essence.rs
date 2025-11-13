@@ -9,7 +9,7 @@ struct TeraFunc {
     nons: Vec<String>,
 }
 
-pub fn generate_essence_output(adt: &Adt, funs: &[Func], verbose: bool) -> String {
+pub fn generate_essence_output(adt: &Adt, funs: &[Func], verbose: bool, min: i32, max: i32) -> String {
     let tera = tera::Tera::new("src/templates/*.tera").unwrap();
     let mut context = tera::Context::new();
 
@@ -20,9 +20,11 @@ pub fn generate_essence_output(adt: &Adt, funs: &[Func], verbose: bool) -> Strin
         "funcs",
         &funs
             .iter()
-            .map(|f| funtext(adt, f.clone(), verbose))
+            .map(|f| funtext(adt, f.clone(), verbose, min))
             .collect::<Vec<TeraFunc>>(),
     );
+    context.insert("min", &min);
+    context.insert("max", &max);
 
     let essence_spec = tera.render("essence.tera", &context).unwrap();
 
@@ -40,7 +42,7 @@ pub fn generate_essence_output(adt: &Adt, funs: &[Func], verbose: bool) -> Strin
     path.to_string()
 }
 
-fn funtext(adt: &Adt, func: Func, _verbose: bool) -> TeraFunc {
+fn funtext(adt: &Adt, func: Func, _verbose: bool, min: i32) -> TeraFunc {
     let prefixes = adt
         .constructors
         .iter()
@@ -67,7 +69,7 @@ fn funtext(adt: &Adt, func: Func, _verbose: bool) -> TeraFunc {
         for (j, t) in con.types.iter().enumerate() {
             match t {
                 Type::Int => {
-                    nons.push(format!(" {}_{} = 1", con.prefix, j + 1));
+                    nons.push(format!(" {}_{} = {min}", con.prefix, j + 1));
                 }
                 Type::Bool => {
                     nons.push(format!(" {}_{} = false", con.prefix, j + 1));

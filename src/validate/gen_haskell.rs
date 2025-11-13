@@ -133,7 +133,7 @@ fn gen_value(adt: Adt, assignments: &Vec<(String, String)>, verbose: bool) -> As
                 value.push_str("False ");
                 continue;
             }
-            value.push_str(&format!("{val} "));
+            value.push_str(&format!("({val}) "));
         }
     }
 

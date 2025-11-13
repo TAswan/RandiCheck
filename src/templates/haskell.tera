@@ -8,7 +8,7 @@ predicate {{f.input}}  = {{ f.opp }}
 {% endfor %}
 
 value :: D
-value = {{assignments.var}} {{assignments.val}}
+value = ({{assignments.var}} {{assignments.val}})
 
 
 main :: IO ()

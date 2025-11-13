@@ -3,7 +3,7 @@ language essence 1.3
 {% for c in adt.constructors -%}
 {%- for t in c.types -%}
 
-find {{c.prefix}}_{{loop.index}} : {{t | lower}}{%if t == "Int" -%}(1..5) {% endif %} 
+find {{c.prefix}}_{{loop.index}} : {{t | lower}}{%if t == "Int" -%}({{min}}..{{max}}) {% endif %} 
 
 {% endfor -%}
 {%- endfor -%}

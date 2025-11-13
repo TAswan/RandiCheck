@@ -13,6 +13,15 @@ struct Args {
     #[arg(value_name = "INPUT", default_value = "input_files/example.hs")]
     input: String,
 
+    /// minimum value for integer variables
+    #[arg(long, default_value_t = -10)]
+    min: i32,
+
+    /// maximum value for integer variables
+    /// default: 10
+    #[arg(long, default_value_t = 10)]
+    max: i32,
+
     /// Enable verbose output
     #[arg(short, long)]
     verbose: bool,
@@ -33,6 +42,13 @@ fn main() {
     let verbose = args.verbose;
     let oxide_out = args.oxide_out;
     let generate = args.generate;
+    let min = args.min;
+    let max = args.max;
+
+    if min >= max {
+        eprintln!("Error: Minimum value must be less than maximum value.");
+        return;
+    }
 
     if generate {
         randi_check::random_generation::new_haskell::generate_haskell_random(6, verbose);
@@ -45,7 +61,7 @@ fn main() {
 
     let (adt, funcs) = parser::parse(&source_code, filetype, verbose);
 
-    let spec = codegen::output(&adt, &funcs, oxide_out, verbose);
+    let spec = codegen::output(&adt, &funcs, oxide_out, verbose, min, max);
 
     solve_conjure(spec, verbose);
 

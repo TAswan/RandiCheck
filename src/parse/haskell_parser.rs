@@ -270,9 +270,6 @@ fn parse_operation(cursor: &mut TreeCursor<'_>, source_code: &str, verbose: bool
         "parens" => {
             cursor.goto_first_child(); // go to '('
             cursor.goto_next_sibling(); // go to inner expression
-            let inner_node = cursor.node();
-            print_node(&inner_node, source_code);
-            print_nodes(&inner_node, 0, source_code, false);
             parse_operation(cursor, source_code, verbose)
         }
         "constructor" => {
