@@ -18,6 +18,7 @@ struct Assignments {
 struct FuncInput {
     input: String,
     opp: String,
+    where_clause: Option<String>,
 }
 
 #[must_use]
@@ -85,10 +86,29 @@ fn gen_predicate(funcs: Vec<Func>) -> Vec<FuncInput> {
         let mut pred_code = String::new();
 
         let _ = writeln!(pred_code, "{} ", func.opp.to_haskell());
+        let mut where_clause = String::new();
+        if !func.local_binds.is_empty() {
+            let _ = writeln!(where_clause, "    where ");
+            for local_bind in &func.local_binds {
+                let _ = writeln!(
+                    where_clause,
+                    "      {} {} = {}",
+                    local_bind.con.prefix,
+                    local_bind.con.input.join(" "),
+                    local_bind.opp.to_haskell()
+                );
+            }
+            pred_code.push_str(&where_clause);
+        }
 
         result.push(FuncInput {
             input: func.con.to_string(),
             opp: pred_code,
+            where_clause: if !func.local_binds.is_empty() {
+                Some(where_clause)
+            } else {
+                None
+            },
         });
     }
     result
@@ -108,13 +128,13 @@ fn gen_value(adt: Adt, assignments: &Vec<(String, String)>, verbose: bool) -> As
     if verbose {
         println!("Generating Haskell value code for tag value: {tag_value_int}");
     }
-    // find the constructor corresponding to the tag value
-    // reverse the adt because of previous stack shenanigans
-    let adt = Adt {
-        name: adt.name,
-        constructors: adt.constructors.into_iter().rev().collect(),
-    };
-
+    /*  find the constructor corresponding to the tag value
+        // reverse the adt because of previous stack shenanigans
+        let adt = Adt {
+            name: adt.name,
+            constructors: adt.constructors.into_iter().rev().collect(),
+        };
+    */
     let constructor = &adt.constructors[(tag_value_int - 1) as usize];
     if verbose {
         println!("Using constructor: {}", constructor.prefix);

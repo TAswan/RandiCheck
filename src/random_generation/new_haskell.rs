@@ -127,7 +127,11 @@ fn generate_func(rng: &mut impl Rng, adt: &Adt, max_depth: u32, verbose: bool) -
             crate::adt::Type::Bool,
         );
 
-        let func = crate::adt::Func { con, opp };
+        let func = crate::adt::Func {
+            con,
+            opp,
+            local_binds: Vec::new(),
+        };
         result.push(func);
     }
     result
@@ -162,6 +166,7 @@ fn generate_operation(
         return match return_type {
             crate::adt::Type::Bool => Operation::BoolLit(rng.random_bool(0.5)),
             crate::adt::Type::Int => Operation::IntLit(rng.random_range(1..=100)),
+            crate::adt::Type::Custom(_) => todo!(),
         };
     }
 
@@ -379,5 +384,6 @@ fn generate_operation(
             ),
             _ => panic!(),
         },
+        crate::adt::Type::Custom(_) => todo!(),
     }
 }

@@ -1,4 +1,4 @@
-use tree_sitter::{Tree, TreeCursor};
+use tree_sitter::{Node, Tree, TreeCursor};
 
 use crate::adt::{Adt, Cons, Func, FuncInput, Operation, Type};
 use crate::parse::parser_utils::{
@@ -57,7 +57,15 @@ pub fn collect_haskell_adts(tree: &Tree, source_code: &str, verbose: bool) -> Ad
             let ty = match type_str {
                 "Bool" => Type::Bool,
                 "Int" => Type::Int,
-                _ => panic!("Unknown type: {type_str}"),
+
+                _ => {
+                    // if recursive (eg tree)
+                    if type_str == name_str {
+                        Type::Custom(type_str.to_string())
+                    } else {
+                        panic!("Unknown type: {type_str}")
+                    }
+                }
             };
             type_vec.push(ty);
         }
@@ -133,20 +141,46 @@ pub fn collect_haskell_functions(
                 }
             }
         }
-
+        if verbose {
+            println!("Function nodes: {}", functions.len());
+            println!(
+                "Function sources: {:?}",
+                functions
+                    .iter()
+                    .map(|f| &source_code[f.start_byte()..f.end_byte()])
+                    .collect::<Vec<&str>>()
+            );
+        }
         let mut input_cons: Vec<FuncInput> = Vec::new();
         for function in functions {
             let patterns = traverse_and_capture_from_node(function, "patterns");
 
-            assert!(
-                (patterns.len() == 1),
-                "Expected exactly one patterns node in the function. Found {}",
-                patterns.len()
-            );
+            if verbose {
+                println!("Patterns nodes: {}", patterns.len());
+                println!(
+                    "Patterns: {:?}",
+                    patterns
+                        .iter()
+                        .map(|p| &source_code[p.start_byte()..p.end_byte()])
+                        .collect::<Vec<&str>>()
+                );
+            }
 
-            let pattern = &patterns[0];
+            // the last (first because of traverse reversing) pattern is what we want
+            let pattern = &patterns[patterns.len() - 1];
 
             let constructors = traverse_and_capture_from_node(*pattern, "constructor");
+
+            if verbose {
+                println!("Constructor nodes: {}", constructors.len());
+                println!(
+                    "Constructors: {:?}",
+                    constructors
+                        .iter()
+                        .map(|c| &source_code[c.start_byte()..c.end_byte()])
+                        .collect::<Vec<&str>>()
+                );
+            }
             assert!(
                 (constructors.len() == 1),
                 "Expected exactly one constructor in the pattern"
@@ -175,29 +209,41 @@ pub fn collect_haskell_functions(
             };
             input_cons.push(con.clone());
             let operations = traverse_and_capture_from_node(function, "match");
-            assert!(
-                (operations.len() == 1),
-                "Expected exactly one match in the function"
-            );
 
             if verbose {
                 println!("Operations nodes: {}", operations.len());
                 println!("Operations: {operations:?}");
                 println!(
-                    "Operations source: {}",
-                    &source_code[operations[0].start_byte()..operations[0].end_byte()]
+                    "Operations source: {:?}",
+                    operations
+                        .iter()
+                        .map(|o| &source_code[o.start_byte()..o.end_byte()])
+                        .collect::<Vec<&str>>()
                 );
             }
 
-            let mut child_cursor = operations[0].walk();
+            // we only care for the last match (first because of traverse reversing)
+            let mut child_cursor = operations[operations.len() - 1].walk();
             child_cursor.goto_first_child();
             child_cursor.goto_next_sibling(); // skip "match"
 
             let operation = parse_operation(&mut child_cursor, source_code, verbose);
 
+            let mut binds = Vec::new();
+
+            let local_binds = traverse_and_capture_from_node(function, "local_binds");
+            if !local_binds.is_empty() {
+                assert!(
+                    (local_binds.len() == 1),
+                    "Expected exactly one local_binds node"
+                );
+                binds = parse_local_binds(source_code, verbose, local_binds[0]);
+            }
+
             let func = Func {
                 con: con.clone(),
                 opp: operation,
+                local_binds: binds,
             };
             funcs.push(func.clone());
         }
@@ -283,10 +329,104 @@ fn parse_operation(cursor: &mut TreeCursor<'_>, source_code: &str, verbose: bool
             }
         }
 
+        "apply" => {
+            cursor.goto_first_child(); // go to function
+            let func = parse_operation(cursor, source_code, verbose);
+            cursor.goto_next_sibling(); // go to argument
+            let arg = parse_operation(cursor, source_code, verbose);
+            Operation::Apply(Box::new(func), Box::new(arg))
+        }
+
         _ => panic!(
             "Unknown operand kind: {}, {:?}",
             child.kind(),
             print_nodes(&child, 0, source_code, false)
         ),
     }
+}
+
+fn parse_local_binds(source_code: &str, verbose: bool, bind: Node<'_>) -> Vec<Func> {
+    let mut functions = Vec::new();
+
+    let funcs = traverse_and_capture_from_node(bind, "function");
+
+    for func in funcs {
+        let cursor = &mut func.walk();
+
+        cursor.goto_first_child();
+        let func_name = &source_code[cursor.node().start_byte()..cursor.node().end_byte()];
+
+        assert!(
+            (cursor.node().kind() == "variable"),
+            "Expected variable node in local bind"
+        );
+
+        cursor.goto_next_sibling();
+        assert!(
+            (cursor.node().kind() == "patterns"),
+            "Expected patterns node in local bind function"
+        );
+        cursor.goto_first_child();
+
+        let variables = traverse_and_capture_from_node(cursor.node(), "variable");
+        let literals = traverse_and_capture_from_node(cursor.node(), "literal");
+
+        if verbose {
+            println!(
+                "Local bind function variables: {:?}",
+                variables
+                    .iter()
+                    .map(|v| &source_code[v.start_byte()..v.end_byte()])
+                    .collect::<Vec<&str>>()
+            );
+            println!(
+                "Local bind function literals: {:?}",
+                literals
+                    .iter()
+                    .map(|l| &source_code[l.start_byte()..l.end_byte()])
+                    .collect::<Vec<&str>>()
+            );
+        }
+
+        // currently only handling variables and literals as inputs, not adts
+
+        let mut inputs = Vec::new(); // Placeholder for inputs
+
+        if !variables.is_empty() {
+            for var in variables {
+                let var_name = &source_code[var.start_byte()..var.end_byte()];
+                inputs.push(var_name.to_string());
+            }
+        }
+
+        if !literals.is_empty() {
+            for lit in literals {
+                let lit_value = &source_code[lit.start_byte()..lit.end_byte()];
+                inputs.push(lit_value.to_string());
+            }
+        }
+
+        cursor.goto_parent(); // back to patterns
+        cursor.goto_next_sibling(); // go to body
+
+        assert!(
+            cursor.node().kind() == "match",
+            "Expected match node in local bind function body"
+        );
+        cursor.goto_first_child(); // go to "="
+        cursor.goto_next_sibling(); // go to expression
+        let operation = parse_operation(cursor, source_code, verbose);
+
+        let func = Func {
+            con: FuncInput {
+                prefix: func_name.to_string(),
+                input: inputs,
+            },
+            opp: operation,
+            local_binds: Vec::new(),
+        };
+        functions.push(func);
+    }
+
+    functions
 }

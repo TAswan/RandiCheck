@@ -166,6 +166,7 @@ pub fn collect_rust_functions(
                 let func = Func {
                     con: func_input,
                     opp: Operation::Var(value),
+                    local_binds: Vec::new(),
                 };
                 funcs.push(func);
             }
@@ -210,6 +211,7 @@ pub fn collect_rust_functions(
                 let func = Func {
                     con: func_input,
                     opp: operation,
+                    local_binds: Vec::new(),
                 };
                 funcs.push(func);
             }

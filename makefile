@@ -10,4 +10,6 @@ clean:
 	cargo clean
 	rm output.essence 
 	rm -rf conjure-output
+	rm output.solution
+	rm validation.*
 	

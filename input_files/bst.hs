@@ -4,9 +4,11 @@ data Tree = Leaf
 
 isBST :: Tree -> Bool
 isBST Leaf = True
-isBST (Node v left right) = f (<=v) left && f (>=v) right && isBST left && isBST right
+isBST (Node v left right) = (f v left) && (g v right) && (isBST left) && (isBST right)
    where
-     f _ Leaf = True
-     f c (Node h l r) = c h && f c l && f c r
+     f c Leaf = True
+     f c (Node h l r) = (h <= c) && (f c l) && (f c r)
+     g c Leaf = True
+     g c (Node h l r) = (h >= c) && (g c l) && (g c r)
 
      

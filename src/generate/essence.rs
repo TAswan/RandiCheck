@@ -9,7 +9,13 @@ struct TeraFunc {
     nons: Vec<String>,
 }
 
-pub fn generate_essence_output(adt: &Adt, funs: &[Func], verbose: bool, min: i32, max: i32) -> String {
+pub fn generate_essence_output(
+    adt: &Adt,
+    funs: &[Func],
+    verbose: bool,
+    min: i32,
+    max: i32,
+) -> String {
     let tera = tera::Tera::new("src/templates/*.tera").unwrap();
     let mut context = tera::Context::new();
 
@@ -74,6 +80,7 @@ fn funtext(adt: &Adt, func: Func, _verbose: bool, min: i32) -> TeraFunc {
                 Type::Bool => {
                     nons.push(format!(" {}_{} = false", con.prefix, j + 1));
                 }
+                Type::Custom(_) => todo!(),
             }
         }
     }
@@ -154,7 +161,131 @@ fn convert_variables(op: &Operation, func: Func) -> String {
             let val = convert_variables(x, func.clone());
             format!("not {val}")
         }
+        Operation::Apply(f, arg) => apply(f, arg, func),
 
+        x => x.to_string(),
+    }
+}
+
+fn apply(f: &Operation, arg: &Operation, func: Func) -> String {
+    // get all functions in local_binds with prefix matching f
+    let funcs = func
+        .local_binds
+        .iter()
+        .filter(|fb| match f {
+            Operation::Var(name) => fb.con.prefix == *name,
+            _ => false,
+        })
+        .collect::<Vec<&Func>>();
+
+    if funcs.is_empty() {
+        panic!(
+            "Function {} not found in local binds",
+            match f {
+                Operation::Var(name) => name.clone(),
+                _ => "unknown".to_string(),
+            }
+        );
+    }
+
+    let mut apply_str = String::new();
+
+    for (i, fb) in funcs.iter().enumerate() {
+        let input = fb.con.input.first().expect("Function has no input");
+
+        let arg_str = convert_variables(arg, func.clone());
+
+        let replaced_op = replace_variable(&fb.opp, input, &arg_str, func.clone());
+
+        apply_str.push_str(&format!("({})", replaced_op));
+
+        if i < funcs.len() - 1 {
+            apply_str.push_str(" \\/ ");
+        }
+    }
+
+    apply_str
+}
+
+fn replace_variable(op: &Operation, var_name: &String, replacement: &String, func: Func) -> String {
+    match op {
+        Operation::Var(name) => {
+            if name == var_name {
+                replacement.clone()
+            } else {
+                let index = func
+                    .con
+                    .input
+                    .iter()
+                    .position(|n| n == name)
+                    .expect("Variable name not found in function input");
+                format!("{}_{}", func.con.prefix, index + 1)
+            }
+        }
+        Operation::Add(x, y) => {
+            let left = replace_variable(x, var_name, replacement, func.clone());
+            let right = replace_variable(y, var_name, replacement, func.clone());
+            format!("{left} + {right}")
+        }
+        Operation::Gt(x, y) => {
+            let left = replace_variable(x, var_name, replacement, func.clone());
+            let right = replace_variable(y, var_name, replacement, func.clone());
+            format!("{left} > {right}")
+        }
+        Operation::Lt(x, y) => {
+            let left = replace_variable(x, var_name, replacement, func.clone());
+            let right = replace_variable(y, var_name, replacement, func.clone());
+            format!("{left} < {right}")
+        }
+        Operation::Eq(x, y) => {
+            let left = replace_variable(x, var_name, replacement, func.clone());
+            let right = replace_variable(y, var_name, replacement, func.clone());
+            format!("{left} = {right}")
+        }
+        Operation::Neq(x, y) => {
+            let left = replace_variable(x, var_name, replacement, func.clone());
+            let right = replace_variable(y, var_name, replacement, func.clone());
+            format!("{left} != {right}")
+        }
+        Operation::Leq(x, y) => {
+            let left = replace_variable(x, var_name, replacement, func.clone());
+            let right = replace_variable(y, var_name, replacement, func.clone());
+            format!("{left} <= {right}")
+        }
+        Operation::Geq(x, y) => {
+            let left = replace_variable(x, var_name, replacement, func.clone());
+            let right = replace_variable(y, var_name, replacement, func.clone());
+            format!("{left} >= {right}")
+        }
+        Operation::Sub(x, y) => {
+            let left = replace_variable(x, var_name, replacement, func.clone());
+            let right = replace_variable(y, var_name, replacement, func.clone());
+            format!("{left} - {right}")
+        }
+        Operation::Mul(x, y) => {
+            let left = replace_variable(x, var_name, replacement, func.clone());
+            let right = replace_variable(y, var_name, replacement, func.clone());
+            format!("{left} * {right}")
+        }
+        Operation::And(x, y) => {
+            let left = replace_variable(x, var_name, replacement, func.clone());
+            let right = replace_variable(y, var_name, replacement, func.clone());
+            format!("{left} && {right}")
+        }
+        Operation::Or(x, y) => {
+            let left = replace_variable(x, var_name, replacement, func.clone());
+            let right = replace_variable(y, var_name, replacement, func.clone());
+            format!("{left} || {right}")
+        }
+        Operation::Not(x) => {
+            let val = replace_variable(x, var_name, replacement, func.clone());
+            format!("not {val}")
+        }
+        Operation::Apply(f, arg) => {
+            let func_str = replace_variable(f, var_name, replacement, func.clone());
+            let arg_str = replace_variable(arg, var_name, replacement, func.clone());
+            format!("{}({})", func_str, arg_str)
+        }
         x => x.to_string(),
     }
 }

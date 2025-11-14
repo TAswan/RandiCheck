@@ -9,6 +9,9 @@ predicate {{f.input}}  = {{ f.opp }}
 
 value :: D
 value = ({{assignments.var}} {{assignments.val}})
+{% if assignments.where_clause is defined %}
+    assignments.where_clause
+{% endif %}
 
 
 main :: IO ()

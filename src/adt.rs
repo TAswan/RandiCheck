@@ -19,6 +19,7 @@ pub struct Cons {
 pub struct Func {
     pub con: FuncInput,
     pub opp: Operation,
+    pub local_binds: Vec<Func>,
 }
 impl fmt::Display for Func {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -43,6 +44,7 @@ pub enum Operation {
     Add(Box<Operation>, Box<Operation>),
     Sub(Box<Operation>, Box<Operation>),
     Mul(Box<Operation>, Box<Operation>),
+    Apply(Box<Operation>, Box<Operation>),
 }
 
 impl fmt::Display for Operation {
@@ -63,6 +65,7 @@ impl fmt::Display for Operation {
             Operation::And(l, r) => write!(f, "({l} /\\ {r})"),
             Operation::Or(l, r) => write!(f, "({l} \\/ {r})"),
             Operation::Not(o) => write!(f, "!({o})"),
+            Operation::Apply(func, arg) => write!(f, "({func} {arg})"),
         }
     }
 }
@@ -88,6 +91,9 @@ impl Operation {
             Operation::And(l, r) => format!("({} && {})", l.to_haskell(), r.to_haskell()),
             Operation::Or(l, r) => format!("({} || {})", l.to_haskell(), r.to_haskell()),
             Operation::Not(o) => format!("not ({})", o.to_haskell()),
+            Operation::Apply(func, arg) => {
+                format!("({} {})", func.to_haskell(), arg.to_haskell())
+            }
         }
     }
 
@@ -160,4 +166,5 @@ impl fmt::Display for FuncInput {
 pub enum Type {
     Bool,
     Int,
+    Custom(String),
 }
